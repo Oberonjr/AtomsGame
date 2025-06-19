@@ -2,25 +2,28 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
+[RequireComponent(typeof(NavMeshAgent))]
 public class Enemy : MonoBehaviour
 {
     public int maxHealth = 100;
     public int currentHealth;
     protected Animator animator;
-    protected Transform playerTransform;
-    protected GameObject player;
+    protected GameObject target;
+    protected Transform targetTransform;
+    protected NavMeshAgent agent;
     
     private void Start()
     {
         currentHealth = maxHealth;
         animator = GetComponent<Animator>();
+        agent = GetComponent<NavMeshAgent>();
     }
 
     protected virtual void Awake()
     {
-        player = GameObject.FindGameObjectWithTag("Player");
-        playerTransform = player.transform;
+        
     }
 
     protected virtual void Update()

@@ -12,7 +12,7 @@ public class FarEnemy : Enemy
     [SerializeField] private float moveSpeed = 2f;
     [SerializeField] private Transform firePoint;
 
-    private float distanceFromPlayer;
+    private float distanceFromtarget;
     private float currentAmmo;
     private bool isReloading;
     private const int FAR_RANGE = 1;
@@ -24,11 +24,11 @@ public class FarEnemy : Enemy
     private const int CLOSE_IN = 2;
     private int MOVE_AXIS;
 
-    // Implement the tracking and movement towards the player
+    // Implement the tracking and movement towards the target
     protected void TrackAndMove()
     {
-        transform.position = Vector2.MoveTowards(transform.position, playerTransform.position, moveSpeed * Time.deltaTime);
-        Vector2 direction = playerTransform.position - transform.position;
+        transform.position = Vector2.MoveTowards(transform.position, targetTransform.position, moveSpeed * Time.deltaTime);
+        Vector2 direction = targetTransform.position - transform.position;
         transform.up = direction * MOVE_AXIS;
     }
 
@@ -76,13 +76,13 @@ public class FarEnemy : Enemy
 
         if (!isReloading)
         { 
-            distanceFromPlayer = Vector2.Distance(transform.position, playerTransform.position);
-            if (distanceFromPlayer <= longRange && distanceFromPlayer > shortRange)
+            distanceFromtarget = Vector2.Distance(transform.position, targetTransform.position);
+            if (distanceFromtarget <= longRange && distanceFromtarget > shortRange)
             {
                 MOVE_AXIS = STAND_STILL;
                 FIRE_MODE = FAR_RANGE;
             }
-            else if (distanceFromPlayer <= shortRange)
+            else if (distanceFromtarget <= shortRange)
             {
                 MOVE_AXIS = BACK_AWAY;
                 FIRE_MODE = CLOSE_RANGE;

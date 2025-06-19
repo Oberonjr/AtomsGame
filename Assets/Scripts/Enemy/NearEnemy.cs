@@ -23,20 +23,18 @@ public class NearEnemy : Enemy
     protected override void Update()
     {
         base.Update();
-        if(!isAttacking)MoveTowardsPlayer();
+        if(!isAttacking)MoveTowardsTarget();
         Attack();
     }
 
-    private void MoveTowardsPlayer()
+    private void MoveTowardsTarget()
     {
-        transform.position = Vector2.MoveTowards(transform.position, playerTransform.position, moveSpeed * Time.deltaTime);
-        Vector2 direction = playerTransform.position - transform.position;
-        transform.up = direction;
+        agent.SetDestination(targetTransform.position);
     }
 
     private void Attack()
     {
-        if (Vector2.Distance(transform.position, playerTransform.position) <= attackRange)
+        if (Vector2.Distance(transform.position, targetTransform.position) <= attackRange)
         {
             isAttacking = true;
             if (canAttackSlash)
