@@ -816,7 +816,7 @@ Transform:
   m_GameObject: {fileID: 721523281}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -32.026417, y: -8.263045, z: 0.01}
+  m_LocalPosition: {x: -15, y: 0, z: 0.01}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -834,7 +834,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b0cbaf88f41dba14fba8d472b4603b90, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Radius: 15
+  Radius: 12
   _teamColor: {r: 1, g: 0, b: 0, a: 1}
   ShowGizmo: 1
   ShowInnerArea: 1
@@ -1315,7 +1315,7 @@ Transform:
   m_GameObject: {fileID: 978634500}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 32.34958, y: 9.255667, z: 0.01}
+  m_LocalPosition: {x: 15, y: 0, z: 0.01}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1333,7 +1333,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b0cbaf88f41dba14fba8d472b4603b90, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Radius: 15
+  Radius: 12
   _teamColor: {r: 0, g: 0.12156868, b: 1, a: 1}
   ShowGizmo: 1
   ShowInnerArea: 1
@@ -2412,7 +2412,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 25
+  orthographic size: 15
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2

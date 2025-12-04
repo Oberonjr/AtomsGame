@@ -152,7 +152,7 @@ public class TeamArea : MonoBehaviour
             _circleRenderer.sprite = CreateCircleSprite();
             
             // Set sorting order to render behind units
-            _circleRenderer.sortingOrder = -10;
+            _circleRenderer.sortingOrder = -4;
         }
 
         if (_circleRenderer != null)
@@ -163,7 +163,7 @@ public class TeamArea : MonoBehaviour
             _circleRenderer.color = circleColor;
             
             // Scale to match radius (assuming sprite is 1 unit = 1 world unit)
-            float scale = Radius * 2f;
+            float scale = Radius;
             _runtimeCircle.transform.localScale = new Vector3(scale, scale, 1f);
         }
     }

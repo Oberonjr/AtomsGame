@@ -11,6 +11,10 @@ public class TeamAreaEditor : Editor
     private SerializedProperty showInnerAreaProperty;
     private SerializedProperty showBorderProperty;
     private SerializedProperty borderThicknessProperty;
+    
+    // Runtime visualization properties
+    private SerializedProperty circleSpritePrefabProperty;
+    private SerializedProperty showRuntimeCircleProperty;
 
     private void OnEnable()
     {
@@ -18,11 +22,15 @@ public class TeamAreaEditor : Editor
 
         // Cache serialized properties
         radiusProperty = serializedObject.FindProperty("Radius");
-        teamColorProperty = serializedObject.FindProperty("_teamColor"); // Changed from "TeamColor" to "_teamColor"
+        teamColorProperty = serializedObject.FindProperty("_teamColor");
         showGizmoProperty = serializedObject.FindProperty("ShowGizmo");
         showInnerAreaProperty = serializedObject.FindProperty("ShowInnerArea");
         showBorderProperty = serializedObject.FindProperty("ShowBorder");
         borderThicknessProperty = serializedObject.FindProperty("BorderThickness");
+        
+        // Runtime visualization properties
+        circleSpritePrefabProperty = serializedObject.FindProperty("CircleSpritePrefab");
+        showRuntimeCircleProperty = serializedObject.FindProperty("ShowRuntimeCircle");
     }
 
     public override void OnInspectorGUI()
@@ -31,8 +39,8 @@ public class TeamAreaEditor : Editor
 
         EditorGUILayout.Space(5);
 
-        // Visual Settings
-        EditorGUILayout.LabelField("Visual Settings", EditorStyles.boldLabel);
+        // Visual Settings (Editor Gizmos)
+        EditorGUILayout.LabelField("Editor Gizmo Settings", EditorStyles.boldLabel);
         EditorGUI.indentLevel++;
 
         EditorGUILayout.PropertyField(showGizmoProperty);
@@ -54,6 +62,29 @@ public class TeamAreaEditor : Editor
 
         EditorGUILayout.Space(5);
 
+        // Runtime Visualization Settings
+        EditorGUILayout.LabelField("Runtime Visualization", EditorStyles.boldLabel);
+        EditorGUI.indentLevel++;
+
+        EditorGUILayout.PropertyField(showRuntimeCircleProperty, new GUIContent("Show in Play Mode"));
+        
+        if (showRuntimeCircleProperty.boolValue)
+        {
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(circleSpritePrefabProperty, new GUIContent("Circle Sprite Prefab"));
+            
+            if (circleSpritePrefabProperty.objectReferenceValue == null)
+            {
+                EditorGUILayout.HelpBox("Leave empty to auto-generate a circle sprite at runtime.", MessageType.Info);
+            }
+            
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUI.indentLevel--;
+
+        EditorGUILayout.Space(5);
+
         // Area Settings
         EditorGUILayout.LabelField("Area Settings", EditorStyles.boldLabel);
         EditorGUI.indentLevel++;
@@ -61,16 +92,25 @@ public class TeamAreaEditor : Editor
         EditorGUILayout.PropertyField(radiusProperty);
 
         // Display team color as read-only if subscribed to a team
-        GUI.enabled = teamArea != null && teamArea.GetType().GetField("_subscribedTeam", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(teamArea) == null;
+        bool hasSubscribedTeam = teamArea != null && 
+            teamArea.GetType().GetField("_subscribedTeam", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(teamArea) != null;
+        
+        GUI.enabled = !hasSubscribedTeam;
         EditorGUILayout.PropertyField(teamColorProperty, new GUIContent("Team Color"));
         GUI.enabled = true;
 
-        if (teamArea != null && teamArea.GetType().GetField("_subscribedTeam", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(teamArea) != null)
+        if (hasSubscribedTeam)
         {
             EditorGUILayout.HelpBox("Team color is controlled by the assigned Team in TeamManager.", MessageType.Info);
         }
+        else
+        {
+            EditorGUILayout.HelpBox("This color will be used for both editor gizmos and runtime visualization circles during Prep phase.", MessageType.Info);
+        }
 
         EditorGUI.indentLevel--;
+
+        EditorGUILayout.Space(5);
 
         // Apply changes
         serializedObject.ApplyModifiedProperties();

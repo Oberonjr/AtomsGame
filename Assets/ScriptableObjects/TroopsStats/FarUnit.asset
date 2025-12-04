@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   TroopType: 1
   MaxHealth: 20
-  Damage: 4
+  Damage: 10
   AttackRange: 20
   AttackCooldown: 3.5
   MoveSpeed: 4

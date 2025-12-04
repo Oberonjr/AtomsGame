@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -11,11 +9,12 @@ public class Troop : MonoBehaviour
     [HideInInspector] public int CurrentHealth;
     [HideInInspector] public Troop Target;
     [HideInInspector] public Guid TeamID;
+    [HideInInspector] public bool IsDead = false; // Add this field
 
     private NavMeshAgent _agent;
     private Animator _animator = null;
     private TroopFSM _fsm;
-    private TroopAnimationController _animController;
+    protected TroopAnimationController _animController; // Changed to protected so subclasses can access
 
     public NavMeshAgent Agent => _agent;
     public Animator Animator => _animator;
@@ -24,8 +23,6 @@ public class Troop : MonoBehaviour
     void Awake()
     {
         _agent = GetComponent<NavMeshAgent>();
-
-        // CRITICAL: Configure agent for 2D BEFORE checking if on NavMesh
         _agent.updateRotation = false;
         _agent.updateUpAxis = false;
         transform.rotation = Quaternion.identity;
@@ -35,15 +32,10 @@ public class Troop : MonoBehaviour
     {
         _agent = GetComponent<NavMeshAgent>();
         
-        //// CRITICAL: Configure agent for 2D
-        //_agent.updateRotation = false;
-        //_agent.updateUpAxis = false;
-        
         Vector3 pos = transform.position;
         pos.z = 0f;
         transform.position = pos;
         
-        // Check if on NavMesh
         if (!_agent.isOnNavMesh)
         {
             Debug.LogWarning($"[Troop] {name} spawned off NavMesh at {transform.position}, attempting to warp");
@@ -65,49 +57,47 @@ public class Troop : MonoBehaviour
         CurrentHealth = TroopStats.MaxHealth;
         _agent.speed = TroopStats.MoveSpeed;
 
-        // Configure NavMesh avoidance
         _agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
         _agent.avoidancePriority = 50;
         _agent.radius = 0.5f;
 
-        // Initialize FSM - THIS IS CRITICAL
         _fsm = new TroopFSM();
         _fsm.ChangeState(new IdleState(this));
 
-        // Get animation controller
+        // Get animation controller in base class
         _animController = GetComponent<TroopAnimationController>();
 
-        // Call subclass initialization
         OnStart();
         
         Debug.Log($"[Troop] {name} initialized with FSM in state: {_fsm.CurrentState?.GetType().Name}");
     }
 
-    // Virtual method for subclasses to override
     protected virtual void OnStart()
     {
-        // Override in subclasses if needed
     }
 
     void Update()
     {
         if (_fsm != null)
             _fsm.Update();
+        
+        OnUpdate();
+    }
+
+    protected virtual void OnUpdate()
+    {
     }
 
     void LateUpdate()
     {
-        // AGGRESSIVELY lock Z position and rotation for 2D
         Vector3 pos = transform.position;
         pos.z = 0f;
         transform.position = pos;
         
-        // Lock X and Y rotation to 0
         Vector3 euler = transform.eulerAngles;
         euler.x = 0f;
         euler.y = 0f;
         
-        // ALWAYS face target if we have one, regardless of state
         if (Target != null)
         {
             Vector3 direction = (Target.transform.position - transform.position).normalized;
@@ -119,7 +109,6 @@ public class Troop : MonoBehaviour
         }
         else if (_agent != null && _agent.isOnNavMesh && _agent.velocity.sqrMagnitude > 0.01f)
         {
-            // Face movement direction when moving and no target
             float angle = Mathf.Atan2(_agent.velocity.y, _agent.velocity.x) * Mathf.Rad2Deg;
             euler.z = angle;
         }
@@ -159,7 +148,6 @@ public class Troop : MonoBehaviour
     {
         if (Target != null && Target.CurrentHealth > 0)
         {
-            // Play attack animation
             if (_animController != null)
             {
                 _animController.PlayAttackAnimation();
@@ -171,16 +159,18 @@ public class Troop : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
+        if (IsDead) return; // Early exit if already dead
+        
         CurrentHealth -= damage;
         
-        // Play hit animation
         if (_animController != null)
         {
             _animController.PlayHitAnimation();
         }
         
-        if (CurrentHealth <= 0)
+        if (CurrentHealth <= 0 && !IsDead)
         {
+            IsDead = true;
             Die();
         }
     }

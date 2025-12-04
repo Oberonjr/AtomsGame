@@ -19,27 +19,25 @@ public class ArtilleryTroop : Troop
     public float RocketTurnAcceleration = 50f;
     public float RocketExplosionRadius = 3f;
     public float RocketLifespan = 10f;
+    
+    [Header("VFX Settings")]
     public GameObject RocketExplosionEffectPrefab;
-
-    private TroopAnimationController _animController;
+    [Tooltip("The radius that your VFX was designed for (reference size). The VFX will be automatically scaled to match the explosion radius.")]
+    public float VFXDesignRadius = 0.1f; // Adjust this to your VFX's natural size
 
     protected override void OnStart()
     {
-        _animController = GetComponent<TroopAnimationController>();
     }
 
     public override void Attack()
     {
         if (Target != null && Target.CurrentHealth > 0 && RocketPrefab != null)
         {
-            // Play attack animation FIRST
             if (_animController != null)
             {
                 _animController.PlayAttackAnimation();
             }
 
-            // Spawn rocket after animation delay (handled by Invoke in animation controller)
-            // Or spawn immediately:
             SpawnRocket();
         }
     }
@@ -48,7 +46,6 @@ public class ArtilleryTroop : Troop
     {
         Vector3 spawnPosition = LaunchPoint != null ? LaunchPoint.position : transform.position;
         
-        // Calculate rotation to face target in 2D
         Quaternion spawnRotation = Quaternion.identity;
         if (Target != null)
         {
@@ -62,7 +59,6 @@ public class ArtilleryTroop : Troop
 
         if (rocket != null)
         {
-            // Pass all settings to rocket
             rocket.Initialize(
                 Target, 
                 TroopStats.Damage, 
@@ -76,7 +72,8 @@ public class ArtilleryTroop : Troop
                 RocketTurnAcceleration,
                 RocketExplosionRadius,
                 RocketLifespan,
-                RocketExplosionEffectPrefab
+                RocketExplosionEffectPrefab,
+                VFXDesignRadius
             );
             Debug.Log($"[ArtilleryTroop] Fired rocket at {Target.name}");
         }

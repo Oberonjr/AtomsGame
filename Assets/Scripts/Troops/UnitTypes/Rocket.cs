@@ -1,7 +1,4 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-
 
 public class Rocket : MonoBehaviour
 {
@@ -18,6 +15,7 @@ public class Rocket : MonoBehaviour
     private float _explosionRadius;
     private float _lifespan;
     private GameObject _explosionEffectPrefab;
+    private float _vfxDesignRadius;
 
     private float _currentSpeed;
     private float _currentTurnSpeed;
@@ -38,7 +36,8 @@ public class Rocket : MonoBehaviour
         float turnAcceleration,
         float explosionRadius,
         float lifespan,
-        GameObject explosionEffectPrefab)
+        GameObject explosionEffectPrefab,
+        float vfxDesignRadius)
     {
         _target = target;
         _damage = damage;
@@ -53,6 +52,7 @@ public class Rocket : MonoBehaviour
         _explosionRadius = explosionRadius;
         _lifespan = lifespan;
         _explosionEffectPrefab = explosionEffectPrefab;
+        _vfxDesignRadius = vfxDesignRadius;
         
         _currentSpeed = _initialSpeed;
         _currentTurnSpeed = _initialTurnSpeed;
@@ -180,7 +180,14 @@ public class Rocket : MonoBehaviour
 
         if (_explosionEffectPrefab != null)
         {
-            Instantiate(_explosionEffectPrefab, transform.position, Quaternion.identity);
+            GameObject explosionVFX = Instantiate(_explosionEffectPrefab, transform.position, Quaternion.identity);
+            
+            // Automatically calculate scale to match explosion radius
+            // Formula: scale = explosionRadius / vfxDesignRadius
+            float calculatedScale = _explosionRadius / Mathf.Max(0.01f, _vfxDesignRadius);
+            explosionVFX.transform.localScale = Vector3.one * calculatedScale;
+            
+            Debug.Log($"[Rocket] VFX scaled to {calculatedScale} (radius: {_explosionRadius}, design radius: {_vfxDesignRadius})");
         }
 
         Collider2D[] colliders = Physics2D.OverlapCircleAll(transform.position, _explosionRadius);
@@ -206,7 +213,11 @@ public class Rocket : MonoBehaviour
 
     void OnDrawGizmosSelected()
     {
+        // Only show when rocket is selected
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, _explosionRadius);
+        
+        Gizmos.color = new Color(1f, 0f, 0f, 0.2f);
+        Gizmos.DrawSphere(transform.position, _explosionRadius);
     }
 }

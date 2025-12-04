@@ -15,7 +15,7 @@ public class AttackState : State
     {
         _attackTimer = 0f;
         
-        // Stop agent movement when attacking
+        // Stop agent movement when entering attack state
         if (_troop.Agent != null && _troop.Agent.isOnNavMesh)
         {
             _troop.Agent.isStopped = true;
@@ -40,14 +40,13 @@ public class AttackState : State
         if (_attackTimer >= _troop.TroopStats.AttackCooldown)
         {
             _troop.Attack();
-            // Removed reload trigger - handled by exit time in Animator
             _attackTimer = 0f;
         }
     }
 
     public void Exit()
     {
-        // Resume agent movement
+        // Resume agent movement when leaving attack state
         if (_troop.Agent != null && _troop.Agent.isOnNavMesh)
         {
             _troop.Agent.isStopped = false;

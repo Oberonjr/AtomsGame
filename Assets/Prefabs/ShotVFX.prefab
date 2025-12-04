@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 2554042181744402522}
   - component: {fileID: 6292030480494335632}
   - component: {fileID: 335978951185234988}
+  - component: {fileID: 8543443427373643442}
   m_Layer: 0
   m_Name: ShotVFX
   m_TagString: Untagged
@@ -106,3 +107,17 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &8543443427373643442
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7828506262024581160}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11a6cd3960057054ba0471ea8a8a53d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lifetime: 1
+  useParticleSystemDuration: 0
