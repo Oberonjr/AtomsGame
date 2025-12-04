@@ -7,7 +7,7 @@ AnimationClip:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: AimRocket
-  serializedVersion: 6
+  serializedVersion: 7
   m_Legacy: 0
   m_Compressed: 0
   m_UseHighQualityCurve: 1
@@ -18,7 +18,8 @@ AnimationClip:
   m_ScaleCurves: []
   m_FloatCurves: []
   m_PPtrCurves:
-  - curve:
+  - serializedVersion: 2
+    curve:
     - time: 0
       value: {fileID: 21300000, guid: 22b8e55aa2987c648a8f476299aa4010, type: 3}
     - time: 0.015625
@@ -150,9 +151,10 @@ AnimationClip:
     - time: 1
       value: {fileID: 21300000, guid: 69dcd3e310d22634b93d54439bdc3dd5, type: 3}
     attribute: m_Sprite
-    path: PlayerSprite
+    path: ArtillerySprite
     classID: 212
     script: {fileID: 0}
+    flags: 2
   m_SampleRate: 64
   m_WrapMode: 0
   m_Bounds:
@@ -161,12 +163,14 @@ AnimationClip:
   m_ClipBindingConstant:
     genericBindings:
     - serializedVersion: 2
-      path: 533382794
+      path: 4084439269
       attribute: 0
       script: {fileID: 0}
       typeID: 212
       customType: 23
       isPPtrCurve: 1
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
     pptrCurveMapping:
     - {fileID: 21300000, guid: 22b8e55aa2987c648a8f476299aa4010, type: 3}
     - {fileID: 21300000, guid: 9becbf8815e13c74bb581cf8cace3d25, type: 3}

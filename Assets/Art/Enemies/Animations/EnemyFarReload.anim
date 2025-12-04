@@ -7,7 +7,7 @@ AnimationClip:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: EnemyFarReload
-  serializedVersion: 6
+  serializedVersion: 7
   m_Legacy: 0
   m_Compressed: 0
   m_UseHighQualityCurve: 1
@@ -18,7 +18,8 @@ AnimationClip:
   m_ScaleCurves: []
   m_FloatCurves: []
   m_PPtrCurves:
-  - curve:
+  - serializedVersion: 2
+    curve:
     - time: 0
       value: {fileID: 21300000, guid: e5b1d3a8df146a24cabb41e53272c274, type: 3}
     - time: 0.008333334
@@ -522,9 +523,10 @@ AnimationClip:
     - time: 2.0833333
       value: {fileID: 21300000, guid: 09c6eb5003ca1ad4799ef6331a6c5d58, type: 3}
     attribute: m_Sprite
-    path: EnemyFarSprite
+    path: FarSprite
     classID: 212
     script: {fileID: 0}
+    flags: 2
   m_SampleRate: 120
   m_WrapMode: 0
   m_Bounds:
@@ -533,12 +535,14 @@ AnimationClip:
   m_ClipBindingConstant:
     genericBindings:
     - serializedVersion: 2
-      path: 2283038817
+      path: 2940478479
       attribute: 0
       script: {fileID: 0}
       typeID: 212
       customType: 23
       isPPtrCurve: 1
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
     pptrCurveMapping:
     - {fileID: 21300000, guid: e5b1d3a8df146a24cabb41e53272c274, type: 3}
     - {fileID: 21300000, guid: f9055f14dbabec74f9664180e47be708, type: 3}

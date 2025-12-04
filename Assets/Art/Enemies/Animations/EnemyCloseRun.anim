@@ -7,7 +7,7 @@ AnimationClip:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: EnemyCloseRun
-  serializedVersion: 6
+  serializedVersion: 7
   m_Legacy: 0
   m_Compressed: 0
   m_UseHighQualityCurve: 1
@@ -18,7 +18,8 @@ AnimationClip:
   m_ScaleCurves: []
   m_FloatCurves: []
   m_PPtrCurves:
-  - curve:
+  - serializedVersion: 2
+    curve:
     - time: 0
       value: {fileID: 21300000, guid: d517f80af2fa6a544a7c867c828bdb26, type: 3}
     - time: 0.033333335
@@ -62,9 +63,10 @@ AnimationClip:
     - time: 0.6666667
       value: {fileID: 21300000, guid: 3bf2422fa779b8340b768ac316655c7b, type: 3}
     attribute: m_Sprite
-    path: EnemyCloseSprite
+    path: CloseSprite
     classID: 212
     script: {fileID: 0}
+    flags: 2
   m_SampleRate: 30
   m_WrapMode: 0
   m_Bounds:
@@ -73,12 +75,14 @@ AnimationClip:
   m_ClipBindingConstant:
     genericBindings:
     - serializedVersion: 2
-      path: 2417677937
+      path: 336509619
       attribute: 0
       script: {fileID: 0}
       typeID: 212
       customType: 23
       isPPtrCurve: 1
+      isIntCurve: 0
+      isSerializeReferenceCurve: 0
     pptrCurveMapping:
     - {fileID: 21300000, guid: d517f80af2fa6a544a7c867c828bdb26, type: 3}
     - {fileID: 21300000, guid: c1608dc56db46f1419ab7fd1cadecfd5, type: 3}
