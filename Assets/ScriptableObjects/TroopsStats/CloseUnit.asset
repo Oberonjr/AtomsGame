@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: CloseUnit
   m_EditorClassIdentifier: 
   TroopType: 0
-  MaxHealth: 25
-  Damage: 5
-  AttackRange: 2.1
-  AttackCooldown: 2
+  MaxHealth: 30
+  Damage: 8
+  AttackRange: 2.5
+  AttackCooldown: 1.5
   MoveSpeed: 5
+  InitialAttackDelay: 0.2

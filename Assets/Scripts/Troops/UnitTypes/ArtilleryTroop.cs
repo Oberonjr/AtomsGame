@@ -31,15 +31,15 @@ public class ArtilleryTroop : Troop
 
     public override void Attack()
     {
-        if (Target != null && Target.CurrentHealth > 0 && RocketPrefab != null)
-        {
-            if (_animController != null)
-            {
-                _animController.PlayAttackAnimation();
-            }
+        if (Target == null || Target.IsDead || RocketPrefab == null)
+            return;
 
-            SpawnRocket();
+        if (_animController != null)
+        {
+            _animController.PlayAttackAnimation();
         }
+
+        SpawnRocket();
     }
 
     private void SpawnRocket()

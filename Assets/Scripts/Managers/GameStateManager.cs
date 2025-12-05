@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.IO;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -14,7 +15,10 @@ public class GameStateManager : MonoBehaviour
 
     [Header("References")]
     public LayerMask GroundLayer;
-    public LayerMask UILayer; // Add UI layer mask
+    public LayerMask UILayer;
+
+    [Header("Save System")]
+    public string SaveDirectory = "BattleLayouts";
 
     private GameState _currentState = GameState.Prep;
     private UnitSelectionData _selectedUnit;
@@ -30,6 +34,7 @@ public class GameStateManager : MonoBehaviour
     public event Action<UnitSelectionData> OnUnitSelected;
     public event Action<Team> OnTeamWon;
     public event Action<bool> OnPauseChanged;
+    public event Action OnLayoutCleared; // New event for UI updates
 
     void Awake()
     {
@@ -544,32 +549,235 @@ public class GameStateManager : MonoBehaviour
         Debug.Log($"[GameStateManager] Restored {_activeTroops.Count} troops");
     }
 
+    #region Clear Teams
+
+    public void ClearTeam(Guid teamID)
+    {
+        if (_currentState != GameState.Prep)
+        {
+            Debug.LogWarning("[GameStateManager] Can only clear teams during Prep phase");
+            return;
+        }
+
+        List<Troop> troopsToRemove = new List<Troop>();
+
+        // Find all troops belonging to this team
+        foreach (Troop troop in _activeTroops)
+        {
+            if (troop != null && troop.TeamID == teamID)
+            {
+                troopsToRemove.Add(troop);
+            }
+        }
+
+        // Remove them
+        foreach (Troop troop in troopsToRemove)
+        {
+            RemoveTroop(troop);
+        }
+
+        Debug.Log($"[GameStateManager] Cleared team {teamID}, removed {troopsToRemove.Count} troops");
+        OnLayoutCleared?.Invoke();
+    }
+
+    public void ClearAllTeams()
+    {
+        if (_currentState != GameState.Prep)
+        {
+            Debug.LogWarning("[GameStateManager] Can only clear teams during Prep phase");
+            return;
+        }
+
+        int count = _activeTroops.Count;
+
+        // Destroy all troops
+        foreach (Troop troop in _activeTroops)
+        {
+            if (troop != null)
+            {
+                Destroy(troop.gameObject);
+            }
+        }
+
+        _activeTroops.Clear();
+
+        // Clear team registries
+        if (TeamManager.Instance != null)
+        {
+            foreach (Team team in TeamManager.Instance.Teams)
+            {
+                team?.ClearUnits();
+            }
+        }
+
+        Debug.Log($"[GameStateManager] Cleared all teams, removed {count} troops");
+        OnLayoutCleared?.Invoke();
+    }
+
+    #endregion
+
+    #region Save/Load Layout
+
+    public void SaveCurrentLayout(string layoutName)
+    {
+        if (_currentState != GameState.Prep)
+        {
+            Debug.LogWarning("[GameStateManager] Can only save layouts during Prep phase");
+            return;
+        }
+
+        BattleLayout layout = new BattleLayout
+        {
+            LayoutName = layoutName,
+            DateCreated = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        };
+
+        // Save all active troops
+        foreach (Troop troop in _activeTroops)
+        {
+            if (troop == null || troop.TroopStats == null) continue;
+
+            SavedTroop savedTroop = new SavedTroop
+            {
+                TroopStatsName = troop.TroopStats.name,
+                Position = troop.transform.position,
+                Rotation = troop.transform.rotation,
+                TeamID = troop.TeamID.ToString(),
+                CurrentHealth = troop.CurrentHealth
+            };
+
+            layout.SavedTroops.Add(savedTroop);
+        }
+
+        // Create save directory if it doesn't exist
+        string saveDir = Path.Combine(Application.persistentDataPath, SaveDirectory);
+        if (!Directory.Exists(saveDir))
+        {
+            Directory.CreateDirectory(saveDir);
+        }
+
+        // Save to JSON
+        string fileName = $"{layoutName}_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+        string filePath = Path.Combine(saveDir, fileName);
+        string json = JsonUtility.ToJson(layout, true);
+        File.WriteAllText(filePath, json);
+
+        Debug.Log($"[GameStateManager] Saved layout '{layoutName}' with {layout.SavedTroops.Count} troops to: {filePath}");
+    }
+
+    public void LoadLayout(string filePath)
+    {
+        if (_currentState != GameState.Prep)
+        {
+            Debug.LogWarning("[GameStateManager] Can only load layouts during Prep phase");
+            return;
+        }
+
+        if (!File.Exists(filePath))
+        {
+            Debug.LogError($"[GameStateManager] Layout file not found: {filePath}");
+            return;
+        }
+
+        // Clear existing troops first
+        ClearAllTeams();
+
+        // Load JSON
+        string json = File.ReadAllText(filePath);
+        BattleLayout layout = JsonUtility.FromJson<BattleLayout>(json);
+
+        if (layout == null)
+        {
+            Debug.LogError("[GameStateManager] Failed to parse layout file");
+            return;
+        }
+
+        Debug.Log($"[GameStateManager] Loading layout '{layout.LayoutName}' with {layout.SavedTroops.Count} troops");
+
+        // Spawn troops
+        foreach (SavedTroop savedTroop in layout.SavedTroops)
+        {
+            // Find matching TroopStats
+            UnitSelectionData unitData = AvailableUnits.Find(u =>
+                u?.TroopPrefab != null &&
+                u.TroopPrefab.TroopStats != null &&
+                u.TroopPrefab.TroopStats.name == savedTroop.TroopStatsName);
+
+            if (unitData == null)
+            {
+                Debug.LogWarning($"[GameStateManager] Could not find unit data for: {savedTroop.TroopStatsName}");
+                continue;
+            }
+
+            // Instantiate troop
+            Troop troop = Instantiate(unitData.TroopPrefab, savedTroop.Position, savedTroop.Rotation);
+
+            if (troop != null)
+            {
+                troop.TeamID = Guid.Parse(savedTroop.TeamID);
+                troop.CurrentHealth = savedTroop.CurrentHealth;
+                troop.enabled = false; // Disable during prep
+
+                // Register to team
+                Team owningTeam = FindTeamByID(troop.TeamID);
+                if (owningTeam != null)
+                {
+                    owningTeam.RegisterUnit(troop);
+                }
+
+                _activeTroops.Add(troop);
+            }
+        }
+
+        Debug.Log($"[GameStateManager] Loaded {_activeTroops.Count} troops from layout '{layout.LayoutName}'");
+        OnLayoutCleared?.Invoke(); // Trigger UI update
+    }
+
+    public List<string> GetSavedLayouts()
+    {
+        string saveDir = Path.Combine(Application.persistentDataPath, SaveDirectory);
+        if (!Directory.Exists(saveDir))
+        {
+            return new List<string>();
+        }
+
+        string[] files = Directory.GetFiles(saveDir, "*.json");
+        return new List<string>(files);
+    }
+
+    #endregion
+
     private void OnTeamDefeated(Team defeatedTeam)
     {
         Debug.Log($"[GameStateManager] Team defeated! Current state: {_currentState}");
 
         Team winningTeam = null;
+        int activeTeams = 0;
+
         if (TeamManager.Instance != null)
         {
             foreach (Team team in TeamManager.Instance.Teams)
             {
-                if (team != null && team.ID != defeatedTeam.ID && team.TotalUnits() > 0)
+                if (team != null && team.TotalUnits() > 0)
                 {
+                    activeTeams++;
                     winningTeam = team;
-                    break;
                 }
             }
         }
 
-        if (winningTeam != null)
+        // Check for draw (0 teams remaining) or win (1 team remaining)
+        if (activeTeams == 0)
+        {
+            Debug.Log("[GameStateManager] Draw - no teams remaining!");
+            ChangeState(GameState.Win);
+            OnTeamWon?.Invoke(null); // Pass null to indicate draw
+        }
+        else if (activeTeams == 1 && winningTeam != null)
         {
             Debug.Log($"[GameStateManager] Winner found with {winningTeam.TotalUnits()} units");
             ChangeState(GameState.Win);
             OnTeamWon?.Invoke(winningTeam);
-        }
-        else
-        {
-            Debug.LogWarning("[GameStateManager] No winner found - possible draw!");
         }
     }
 

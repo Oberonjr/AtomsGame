@@ -146,15 +146,15 @@ public class Troop : MonoBehaviour
 
     public virtual void Attack()
     {
-        if (Target != null && Target.CurrentHealth > 0)
+        if (Target == null || Target.IsDead)
+            return;
+
+        if (_animController != null)
         {
-            if (_animController != null)
-            {
-                _animController.PlayAttackAnimation();
-            }
-            
-            Target.TakeDamage(TroopStats.Damage);
+            _animController.PlayAttackAnimation();
         }
+        
+        Target.TakeDamage(TroopStats.Damage);
     }
 
     public void TakeDamage(int damage)

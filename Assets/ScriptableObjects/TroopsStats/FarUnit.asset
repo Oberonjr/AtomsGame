@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: FarUnit
   m_EditorClassIdentifier: 
   TroopType: 1
-  MaxHealth: 20
+  MaxHealth: 25
   Damage: 10
-  AttackRange: 20
-  AttackCooldown: 3.5
+  AttackRange: 25
+  AttackCooldown: 2.2
   MoveSpeed: 4
+  InitialAttackDelay: 1

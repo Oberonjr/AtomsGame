@@ -18,4 +18,8 @@ public class TroopStats : ScriptableObject
     public float AttackRange;
     public float AttackCooldown;
     public float MoveSpeed;
+
+    [Header("Combat Timing")]
+    [Tooltip("Time delay before the first attack after acquiring a new target (prevents instant attacks)")]
+    public float InitialAttackDelay = 0.3f; // Default to 0.3 seconds
 }

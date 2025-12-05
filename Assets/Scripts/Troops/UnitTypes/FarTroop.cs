@@ -50,7 +50,7 @@ public class FarTroop : Troop
 
     public override void Attack()
     {
-        if (Target == null || Target.CurrentHealth <= 0)
+        if (Target == null || Target.IsDead)
             return;
 
         float distance = Vector3.Distance(transform.position, Target.transform.position);
@@ -93,7 +93,7 @@ public class FarTroop : Troop
 
     private void PerformRaycastAttack()
     {
-        if (Target == null) return;
+        if (Target == null || Target.IsDead) return;
 
         Vector3 firePosition = FirePoint != null ? FirePoint.position : transform.position;
         Vector3 direction = (Target.transform.position - firePosition).normalized;
@@ -113,7 +113,7 @@ public class FarTroop : Troop
         if (rayHit.collider != null)
         {
             Troop hitTroop = rayHit.collider.GetComponentInParent<Troop>();
-            if (hitTroop != null && hitTroop.TeamID != TeamID)
+            if (hitTroop != null && hitTroop.TeamID != TeamID && !hitTroop.IsDead)
             {
                 hitTroop.TakeDamage(TroopStats.Damage);
                 Debug.Log($"[FarTroop] Hit {hitTroop.name} for {TroopStats.Damage} damage");

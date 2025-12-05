@@ -49,7 +49,7 @@ public class CloseTroop : Troop
 
     public override void Attack()
     {
-        if (Target == null || Target.CurrentHealth <= 0)
+        if (Target == null || Target.IsDead)
             return;
 
         // Ensure we're completely stopped before attacking
