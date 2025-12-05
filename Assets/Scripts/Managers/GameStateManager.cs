@@ -117,15 +117,20 @@ public class GameStateManager : MonoBehaviour
 
     private void HandlePrepInput()
     {
+        // Block input if save/load panels are active
+        if (GameUIManager.Instance != null && GameUIManager.Instance.ArePanelsActive())
+        {
+            return;
+        }
+
         if (Input.GetMouseButtonDown(0)) // Left click - place unit
         {
-            // Check if clicking on UI first
             if (IsPointerOverUI())
             {
                 return;
             }
             
-            Debug.Log($"[GameStateManager] Left click detected. Selected unit: {(_selectedUnit != null ? _selectedUnit.DisplayName : "None")}");
+            Debug.Log($"[GameStateManager] Selected unit: {(_selectedUnit != null ? _selectedUnit.DisplayName : "None")}");
 
             if (_selectedUnit != null)
             {
@@ -138,13 +143,11 @@ public class GameStateManager : MonoBehaviour
         }
         else if (Input.GetMouseButtonDown(1)) // Right click - remove unit
         {
-            // Check if clicking on UI first
             if (IsPointerOverUI())
             {
                 return;
             }
             
-            Debug.Log("[GameStateManager] Right click detected");
             TryRemoveUnit();
         }
     }
@@ -618,6 +621,7 @@ public class GameStateManager : MonoBehaviour
 
     #region Save/Load Layout
 
+    
     public void SaveCurrentLayout(string layoutName)
     {
         if (_currentState != GameState.Prep)
@@ -656,9 +660,17 @@ public class GameStateManager : MonoBehaviour
             Directory.CreateDirectory(saveDir);
         }
 
-        // Save to JSON
-        string fileName = $"{layoutName}_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+        // Save to JSON with simplified filename format
+        string fileName = $"{layoutName}.json"; // Just use the layout name
         string filePath = Path.Combine(saveDir, fileName);
+
+        // If file already exists, append timestamp to make it unique
+        if (File.Exists(filePath))
+        {
+            fileName = $"{layoutName}_{DateTime.Now:yyMMdd_HHmmss}.json";
+            filePath = Path.Combine(saveDir, fileName);
+        }
+
         string json = JsonUtility.ToJson(layout, true);
         File.WriteAllText(filePath, json);
 
@@ -714,15 +726,22 @@ public class GameStateManager : MonoBehaviour
 
             if (troop != null)
             {
-                troop.TeamID = Guid.Parse(savedTroop.TeamID);
+                // Parse team ID
+                Guid teamID = Guid.Parse(savedTroop.TeamID);
+                troop.TeamID = teamID;
                 troop.CurrentHealth = savedTroop.CurrentHealth;
                 troop.enabled = false; // Disable during prep
 
-                // Register to team
-                Team owningTeam = FindTeamByID(troop.TeamID);
+                // Find and register to team
+                Team owningTeam = FindTeamByID(teamID);
                 if (owningTeam != null)
                 {
-                    owningTeam.RegisterUnit(troop);
+                    owningTeam.RegisterUnit(troop); // This adds to team's Units dictionary
+                    Debug.Log($"[GameStateManager] Registered {troop.name} to team {teamID}");
+                }
+                else
+                {
+                    Debug.LogError($"[GameStateManager] Could not find team with ID: {teamID}");
                 }
 
                 _activeTroops.Add(troop);
@@ -730,6 +749,16 @@ public class GameStateManager : MonoBehaviour
         }
 
         Debug.Log($"[GameStateManager] Loaded {_activeTroops.Count} troops from layout '{layout.LayoutName}'");
+        
+        // Log team counts for verification
+        if (TeamManager.Instance != null)
+        {
+            foreach (Team team in TeamManager.Instance.Teams)
+            {
+                Debug.Log($"[GameStateManager] Team {team.ID} has {team.TotalUnits()} units");
+            }
+        }
+        
         OnLayoutCleared?.Invoke(); // Trigger UI update
     }
 

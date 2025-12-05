@@ -33,12 +33,37 @@ public class GameUIManager : MonoBehaviour
     public Button SaveLayoutButton;
     public Button LoadLayoutButton;
     public TMP_InputField SaveNameInput;
+    public GameObject SaveLayoutPanel; // ADD THIS
+    public Button ConfirmSaveButton; // ADD THIS
     public GameObject LoadLayoutPanel;
     public Transform LoadLayoutButtonContainer;
     public GameObject LoadLayoutButtonPrefab;
 
+    [Header("Confirmation Dialog")]
+    public GameObject ConfirmDeletePanel;
+    public TextMeshProUGUI ConfirmDeleteText;
+    public Button ConfirmDeleteYesButton;
+    public Button ConfirmDeleteNoButton;
+
     private List<Button> _unitButtons = new List<Button>();
     private List<Button> _clearTeamButtons = new List<Button>();
+
+    private static GameUIManager _instance;
+    public static GameUIManager Instance => _instance;
+
+    private string _fileToDelete = null;
+
+    void Awake()
+    {
+        if (_instance == null)
+        {
+            _instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
 
     void Start()
     {
@@ -150,8 +175,9 @@ public class GameUIManager : MonoBehaviour
             return;
         }
 
-        foreach (Team team in TeamManager.Instance.Teams)
+        for (int i = 0; i < TeamManager.Instance.Teams.Count; i++)
         {
+            Team team = TeamManager.Instance.Teams[i];
             if (team == null) continue;
 
             GameObject buttonObj = Instantiate(ClearTeamButtonPrefab, ClearTeamButtonContainer);
@@ -163,7 +189,7 @@ public class GameUIManager : MonoBehaviour
                 TextMeshProUGUI buttonText = button.GetComponentInChildren<TextMeshProUGUI>();
                 if (buttonText != null)
                 {
-                    buttonText.text = $"Clear {team.TeamColor}";
+                    buttonText.text = $"Clear Team {i + 1}"; // Just use index
                 }
 
                 Image buttonImage = button.GetComponent<Image>();
@@ -174,8 +200,7 @@ public class GameUIManager : MonoBehaviour
                     buttonImage.color = color;
                 }
 
-                // Add click listener
-                System.Guid teamID = team.ID; // Capture in closure
+                System.Guid teamID = team.ID;
                 button.onClick.AddListener(() => OnClearTeamClicked(teamID));
 
                 _clearTeamButtons.Add(button);
@@ -223,13 +248,21 @@ public class GameUIManager : MonoBehaviour
         // Save/load buttons
         if (SaveLayoutButton != null)
             SaveLayoutButton.onClick.AddListener(OnSaveLayoutClicked);
-        else
-            Debug.LogWarning("[GameUIManager] SaveLayoutButton is null!");
+
+        if (ConfirmSaveButton != null)
+            ConfirmSaveButton.onClick.AddListener(OnConfirmSaveClicked); // ADD THIS
 
         if (LoadLayoutButton != null)
             LoadLayoutButton.onClick.AddListener(OnLoadLayoutClicked);
         else
             Debug.LogWarning("[GameUIManager] LoadLayoutButton is null!");
+
+        // Delete confirmation buttons
+        if (ConfirmDeleteYesButton != null)
+            ConfirmDeleteYesButton.onClick.AddListener(OnConfirmDeleteYes);
+
+        if (ConfirmDeleteNoButton != null)
+            ConfirmDeleteNoButton.onClick.AddListener(OnConfirmDeleteNo);
     }
 
     private void OnStateChanged(GameState newState)
@@ -240,9 +273,13 @@ public class GameUIManager : MonoBehaviour
         if (SimulateUI != null) SimulateUI.SetActive(newState == GameState.Simulate);
         if (WinUI != null) WinUI.SetActive(newState == GameState.Win);
 
-        if (LoadLayoutPanel != null && newState != GameState.Prep)
+        // Close panels when leaving prep
+        if (newState != GameState.Prep)
         {
-            LoadLayoutPanel.SetActive(false);
+            if (LoadLayoutPanel != null)
+                LoadLayoutPanel.SetActive(false);
+            if (SaveLayoutPanel != null)
+                SaveLayoutPanel.SetActive(false);
         }
     }
 
@@ -251,13 +288,17 @@ public class GameUIManager : MonoBehaviour
         Debug.Log($"[GameUIManager] OnUnitSelected called. Unit: {(unit != null ? unit.DisplayName : "None")}");
         
         // Visual feedback for selected unit
-        foreach (Button button in _unitButtons)
+        for (int i = 0; i < _unitButtons.Count; i++)
         {
+            Button button = _unitButtons[i];
             if (button != null)
             {
                 ColorBlock colors = button.colors;
                 colors.normalColor = Color.white;
                 button.colors = colors;
+                
+                // Force visual refresh
+                button.GetComponent<Image>().color = Color.white;
             }
         }
 
@@ -268,9 +309,13 @@ public class GameUIManager : MonoBehaviour
             
             if (index >= 0 && index < _unitButtons.Count)
             {
-                ColorBlock colors = _unitButtons[index].colors;
+                Button selectedButton = _unitButtons[index];
+                ColorBlock colors = selectedButton.colors;
                 colors.normalColor = Color.yellow;
-                _unitButtons[index].colors = colors;
+                selectedButton.colors = colors;
+                
+                // Force immediate visual update
+                selectedButton.GetComponent<Image>().color = Color.yellow;
                 Debug.Log($"[GameUIManager] Highlighted button at index: {index}");
             }
             else
@@ -298,8 +343,11 @@ public class GameUIManager : MonoBehaviour
             }
             else
             {
-                // Team won
-                WinnerText.text = $"{winner.TeamColor} Team Wins!";
+                // Team won - find team index
+                int teamIndex = TeamManager.Instance != null ? TeamManager.Instance.Teams.IndexOf(winner) : -1;
+                string teamName = teamIndex >= 0 ? $"Team {teamIndex + 1}" : "Team";
+                
+                WinnerText.text = $"{teamName} Wins!";
                 WinnerText.color = winner.TeamColor;
                 if (WinnerColorDisplay != null)
                 {
@@ -333,13 +381,34 @@ public class GameUIManager : MonoBehaviour
 
     private void OnSaveLayoutClicked()
     {
+        Debug.Log("[GameUIManager] Save layout button clicked");
+        
+        if (SaveLayoutPanel != null)
+        {
+            SaveLayoutPanel.SetActive(!SaveLayoutPanel.activeSelf);
+            
+            // Clear input field when opening
+            if (SaveLayoutPanel.activeSelf && SaveNameInput != null)
+            {
+                SaveNameInput.text = "";
+            }
+        }
+    }
+
+    private void OnConfirmSaveClicked()
+    {
         string layoutName = SaveNameInput != null && !string.IsNullOrEmpty(SaveNameInput.text)
             ? SaveNameInput.text
-            : "Layout";
+            : $"Layout_{System.DateTime.Now:yyMMdd_HHmmss}"; // Changed format: yyMMdd_HHmmss
 
-        Debug.Log($"[GameUIManager] Save layout button clicked: {layoutName}");
+        Debug.Log($"[GameUIManager] Confirm save clicked: {layoutName}");
         GameStateManager.Instance?.SaveCurrentLayout(layoutName);
 
+        // Close panel and clear input
+        if (SaveLayoutPanel != null)
+        {
+            SaveLayoutPanel.SetActive(false);
+        }
         if (SaveNameInput != null)
         {
             SaveNameInput.text = "";
@@ -381,25 +450,140 @@ public class GameUIManager : MonoBehaviour
         foreach (string filePath in layouts)
         {
             GameObject buttonObj = Instantiate(LoadLayoutButtonPrefab, LoadLayoutButtonContainer);
-            Button button = buttonObj.GetComponent<Button>();
+            
+            // Assume prefab has: Button (load), Button (delete), TextMeshProUGUI (label)
+            Button[] buttons = buttonObj.GetComponentsInChildren<Button>();
+            TextMeshProUGUI label = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
 
-            if (button != null)
+            if (label != null)
             {
                 string fileName = System.IO.Path.GetFileNameWithoutExtension(filePath);
-                
-                TextMeshProUGUI buttonText = button.GetComponentInChildren<TextMeshProUGUI>();
-                if (buttonText != null)
-                {
-                    buttonText.text = fileName;
-                }
+                label.text = fileName;
+            }
 
+            if (buttons.Length >= 1)
+            {
+                // First button = Load
+                Button loadButton = buttons[0];
                 string path = filePath;
-                button.onClick.AddListener(() =>
+                loadButton.onClick.AddListener(() =>
                 {
                     GameStateManager.Instance?.LoadLayout(path);
                     LoadLayoutPanel.SetActive(false);
                 });
             }
+
+            if (buttons.Length >= 2)
+            {
+                // Second button = Delete
+                Button deleteButton = buttons[1];
+                string path = filePath;
+                string fileName = System.IO.Path.GetFileNameWithoutExtension(filePath);
+                deleteButton.onClick.AddListener(() => OnDeleteLayoutClicked(path, fileName));
+            }
+        }
+    }
+
+    private void OnDeleteLayoutClicked(string filePath, string fileName)
+    {
+        _fileToDelete = filePath;
+        
+        if (ConfirmDeletePanel != null)
+        {
+            ConfirmDeletePanel.SetActive(true);
+            
+            if (ConfirmDeleteText != null)
+            {
+                ConfirmDeleteText.text = $"Delete '{fileName}'?\nThis action cannot be undone.";
+            }
+        }
+    }
+
+    private void OnConfirmDeleteYes()
+    {
+        if (!string.IsNullOrEmpty(_fileToDelete) && System.IO.File.Exists(_fileToDelete))
+        {
+            System.IO.File.Delete(_fileToDelete);
+            Debug.Log($"[GameUIManager] Deleted layout: {_fileToDelete}");
+            
+            // Refresh list
+            PopulateLoadLayoutButtons();
+        }
+
+        _fileToDelete = null;
+        if (ConfirmDeletePanel != null)
+        {
+            ConfirmDeletePanel.SetActive(false);
+        }
+    }
+
+    private void OnConfirmDeleteNo()
+    {
+        _fileToDelete = null;
+        if (ConfirmDeletePanel != null)
+        {
+            ConfirmDeletePanel.SetActive(false);
+        }
+    }
+
+    public bool ArePanelsActive()
+    {
+        return (SaveLayoutPanel != null && SaveLayoutPanel.activeSelf) ||
+               (LoadLayoutPanel != null && LoadLayoutPanel.activeSelf);
+    }
+
+    void Update()
+    {
+        if (GameStateManager.Instance == null) return;
+
+        // Unit selection shortcuts (1-3)
+        if (Input.GetKeyDown(KeyCode.Alpha1) && GameStateManager.Instance.AvailableUnits.Count > 0)
+        {
+            GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[0]);
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha2) && GameStateManager.Instance.AvailableUnits.Count > 1)
+        {
+            GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[1]);
+        }
+        if (Input.GetKeyDown(KeyCode.Alpha3) && GameStateManager.Instance.AvailableUnits.Count > 2)
+        {
+            GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[2]);
+        }
+
+        // Start simulation (Space)
+        if (Input.GetKeyDown(KeyCode.Space) && GameStateManager.Instance.CurrentState == GameState.Prep)
+        {
+            GameStateManager.Instance.StartSimulation();
+        }
+
+        // Save layout (S) - only if save panel is not showing
+        if (Input.GetKeyDown(KeyCode.S) && GameStateManager.Instance.CurrentState == GameState.Prep && 
+            (SaveLayoutPanel == null || !SaveLayoutPanel.activeSelf))
+        {
+            OnSaveLayoutClicked();
+        }
+
+        // Load layout (L) - only if panels are not showing
+        if (Input.GetKeyDown(KeyCode.L) && GameStateManager.Instance.CurrentState == GameState.Prep && 
+            (SaveLayoutPanel == null || !SaveLayoutPanel.activeSelf) &&
+            (LoadLayoutPanel == null || !LoadLayoutPanel.activeSelf))
+        {
+            OnLoadLayoutClicked();
+        }
+
+        // Clear all teams (C)
+        if (Input.GetKeyDown(KeyCode.C) && GameStateManager.Instance.CurrentState == GameState.Prep)
+        {
+            OnClearAllClicked();
+        }
+
+        // Close panels (Escape)
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            if (SaveLayoutPanel != null && SaveLayoutPanel.activeSelf)
+                SaveLayoutPanel.SetActive(false);
+            if (LoadLayoutPanel != null && LoadLayoutPanel.activeSelf)
+                LoadLayoutPanel.SetActive(false);
         }
     }
 }
