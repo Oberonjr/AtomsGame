@@ -13,9 +13,9 @@ public class BattleLayout
 [Serializable]
 public class SavedTroop
 {
-    public string TroopStatsName; // Reference to TroopStats asset name
+    public string TroopStatsName;
     public Vector3 Position;
     public Quaternion Rotation;
-    public string TeamID; // Team GUID as string
+    public int TeamIndex; // CHANGED: From TeamID string to int
     public int CurrentHealth;
 }

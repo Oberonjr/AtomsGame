@@ -4,7 +4,7 @@ public class Rocket : MonoBehaviour
 {
     private Troop _target;
     private int _damage;
-    private System.Guid _teamID;
+    private int _ownerTeamIndex;
     private float _initialStraightTime;
     private float _initialSpeed;
     private float _maxSpeed;
@@ -26,7 +26,7 @@ public class Rocket : MonoBehaviour
     public void Initialize(
         Troop target, 
         int damage, 
-        System.Guid teamID,
+        int ownerTeamIndex,
         float initialStraightTime,
         float initialSpeed,
         float maxSpeed,
@@ -41,7 +41,7 @@ public class Rocket : MonoBehaviour
     {
         _target = target;
         _damage = damage;
-        _teamID = teamID;
+        _ownerTeamIndex = ownerTeamIndex;
         _initialStraightTime = initialStraightTime;
         _initialSpeed = initialSpeed;
         _maxSpeed = maxSpeed;
@@ -142,7 +142,7 @@ public class Rocket : MonoBehaviour
         foreach (Collider2D col in colliders)
         {
             Troop troop = col.GetComponentInParent<Troop>();
-            if (troop != null && troop.TeamID != _teamID && troop.CurrentHealth > 0)
+            if (troop != null && troop.TeamIndex != _ownerTeamIndex && troop.CurrentHealth > 0)
             {
                 float distance = Vector3.Distance(transform.position, troop.transform.position);
                 if (distance < closestDistance)
@@ -167,7 +167,7 @@ public class Rocket : MonoBehaviour
 
         Troop hitTroop = other.GetComponentInParent<Troop>();
 
-        if (hitTroop != null && hitTroop.TeamID != _teamID)
+        if (hitTroop != null && hitTroop.TeamIndex != _ownerTeamIndex)
         {
             Explode();
         }
@@ -194,7 +194,7 @@ public class Rocket : MonoBehaviour
         foreach (Collider2D col in colliders)
         {
             Troop troop = col.GetComponentInParent<Troop>();
-            if (troop != null && troop.TeamID != _teamID)
+            if (troop != null && troop.TeamIndex != _ownerTeamIndex)
             {
                 troop.TakeDamage(_damage);
                 Debug.Log($"[Rocket] Explosion hit {troop.name} for {_damage} damage");

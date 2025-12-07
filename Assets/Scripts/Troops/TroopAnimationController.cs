@@ -53,12 +53,7 @@ public class TroopAnimationController : MonoBehaviour
             return;
         }
 
-        // Log all available parameters
-        Debug.Log($"[AnimController] {gameObject.name} Animator parameters:");
-        foreach (AnimatorControllerParameter param in _animator.parameters)
-        {
-            Debug.Log($"  - {param.name} ({param.type})");
-        }
+        
     }
 
     private void UpdateMovementAnimation()
@@ -105,7 +100,7 @@ public class TroopAnimationController : MonoBehaviour
     private void PlayMeleeAttack()
     {
         string attackParam = _useThrust ? _attackThrustParameterName : _attackSlashParameterName;
-        Debug.Log($"[AnimController] Playing melee attack: {attackParam}");
+        
         
         if (HasParameter(attackParam))
         {
@@ -125,7 +120,7 @@ public class TroopAnimationController : MonoBehaviour
         bool isClose = Vector3.Distance(_troop.transform.position, _troop.Target.transform.position) < _closeRangeDistance;
         string attackParam = isClose ? _hipFireParameterName : _aimedShotParameterName;
         
-        Debug.Log($"[AnimController] Playing ranged attack: {attackParam}");
+        
         
         if (HasParameter(attackParam))
         {
@@ -139,7 +134,7 @@ public class TroopAnimationController : MonoBehaviour
 
     private void PlayArtilleryAttack()
     {
-        Debug.Log($"[AnimController] Playing artillery attack: {_aimRocketParameterName}");
+        
         
         if (HasParameter(_aimRocketParameterName))
         {
@@ -156,7 +151,7 @@ public class TroopAnimationController : MonoBehaviour
     {
         if (_animator != null)
         {
-            Debug.Log($"[AnimController] Playing fire rocket: {_fireRocketParameterName}");
+            
             
             if (HasParameter(_fireRocketParameterName))
             {
@@ -173,7 +168,7 @@ public class TroopAnimationController : MonoBehaviour
     {
         if (_animator != null)
         {
-            Debug.Log($"[AnimController] Playing hit animation: {_hitParameterName}");
+            
             
             if (HasParameter(_hitParameterName))
             {

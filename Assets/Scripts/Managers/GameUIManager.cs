@@ -108,7 +108,7 @@ public class GameUIManager : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[GameUIManager] Creating {GameStateManager.Instance.AvailableUnits.Count} unit buttons");
+        
 
         foreach (var unitData in GameStateManager.Instance.AvailableUnits)
         {
@@ -145,14 +145,14 @@ public class GameUIManager : MonoBehaviour
                 if (buttonImage != null && unitData.Icon != null)
                 {
                     buttonImage.sprite = unitData.Icon;
-                    Debug.Log($"[GameUIManager] Set button icon for: {unitData.DisplayName}");
+                    
                 }
 
                 // Setup button click
                 UnitSelectionData capturedData = unitData;
                 button.onClick.AddListener(() =>
                 {
-                    Debug.Log($"[GameUIManager] Button clicked for: {capturedData.DisplayName}");
+                    
                     GameStateManager.Instance.SelectUnit(capturedData);
                 });
 
@@ -164,7 +164,7 @@ public class GameUIManager : MonoBehaviour
             }
         }
         
-        Debug.Log($"[GameUIManager] Created {_unitButtons.Count} unit buttons");
+       
     }
 
     private void CreateClearTeamButtons()
@@ -185,11 +185,10 @@ public class GameUIManager : MonoBehaviour
 
             if (button != null)
             {
-                // Setup button visuals
                 TextMeshProUGUI buttonText = button.GetComponentInChildren<TextMeshProUGUI>();
                 if (buttonText != null)
                 {
-                    buttonText.text = $"Clear Team {i + 1}"; // Just use index
+                    buttonText.text = $"Clear Team {i + 1}";
                 }
 
                 Image buttonImage = button.GetComponent<Image>();
@@ -200,19 +199,19 @@ public class GameUIManager : MonoBehaviour
                     buttonImage.color = color;
                 }
 
-                System.Guid teamID = team.ID;
-                button.onClick.AddListener(() => OnClearTeamClicked(teamID));
+                int teamIndex = i; // Capture index instead of GUID
+                button.onClick.AddListener(() => OnClearTeamClicked(teamIndex));
 
                 _clearTeamButtons.Add(button);
             }
         }
 
-        Debug.Log($"[GameUIManager] Created {_clearTeamButtons.Count} clear team buttons");
+       
     }
 
     private void SetupButtons()
     {
-        Debug.Log("[GameUIManager] Setting up control buttons...");
+        
         
         if (SimulateButton != null)
             SimulateButton.onClick.AddListener(() => GameStateManager.Instance.StartSimulation());
@@ -285,7 +284,7 @@ public class GameUIManager : MonoBehaviour
 
     private void OnUnitSelected(UnitSelectionData unit)
     {
-        Debug.Log($"[GameUIManager] OnUnitSelected called. Unit: {(unit != null ? unit.DisplayName : "None")}");
+       
         
         // Visual feedback for selected unit
         for (int i = 0; i < _unitButtons.Count; i++)
@@ -305,7 +304,7 @@ public class GameUIManager : MonoBehaviour
         if (unit != null)
         {
             int index = GameStateManager.Instance.AvailableUnits.IndexOf(unit);
-            Debug.Log($"[GameUIManager] Selected unit index: {index}");
+            
             
             if (index >= 0 && index < _unitButtons.Count)
             {
@@ -316,7 +315,7 @@ public class GameUIManager : MonoBehaviour
                 
                 // Force immediate visual update
                 selectedButton.GetComponent<Image>().color = Color.yellow;
-                Debug.Log($"[GameUIManager] Highlighted button at index: {index}");
+                
             }
             else
             {
@@ -367,10 +366,10 @@ public class GameUIManager : MonoBehaviour
         }
     }
 
-    private void OnClearTeamClicked(System.Guid teamID)
+    private void OnClearTeamClicked(int teamIndex)
     {
-        Debug.Log($"[GameUIManager] Clear team button clicked: {teamID}");
-        GameStateManager.Instance?.ClearTeam(teamID);
+        Debug.Log($"[GameUIManager] Clear team button clicked: Team {teamIndex}");
+        GameStateManager.Instance?.ClearTeamByIndex(teamIndex);
     }
 
     private void OnClearAllClicked()

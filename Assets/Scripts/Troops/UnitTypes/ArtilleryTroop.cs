@@ -62,7 +62,7 @@ public class ArtilleryTroop : Troop
             rocket.Initialize(
                 Target, 
                 TroopStats.Damage, 
-                TeamID,
+                TeamIndex, // CHANGED: From TeamID to TeamIndex
                 RocketInitialStraightTime,
                 RocketInitialSpeed,
                 RocketMaxSpeed,

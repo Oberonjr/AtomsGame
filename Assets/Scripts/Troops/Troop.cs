@@ -3,22 +3,120 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
-public class Troop : MonoBehaviour
+public class Troop : MonoBehaviour, ITroop
 {
     public TroopStats TroopStats;
     [HideInInspector] public int CurrentHealth;
     [HideInInspector] public Troop Target;
-    [HideInInspector] public Guid TeamID;
-    [HideInInspector] public bool IsDead = false; // Add this field
+    [HideInInspector] public int TeamIndex; // CHANGED: From Guid to int
+    [HideInInspector] public bool IsDead = false;
+    [HideInInspector] public bool IsAIActive = false; // NEW: Controls AI behavior
 
     private NavMeshAgent _agent;
     private Animator _animator = null;
     private TroopFSM _fsm;
-    protected TroopAnimationController _animController; // Changed to protected so subclasses can access
+    protected TroopAnimationController _animController;
 
     public NavMeshAgent Agent => _agent;
     public Animator Animator => _animator;
     public TroopFSM FSM => _fsm;
+
+    // IMPLEMENT ITroop INTERFACE
+    GameObject ITroop.GameObject
+    {
+        get
+        {
+            // Safe access - return null if destroyed
+            if (this == null) return null;
+            try
+            {
+                return gameObject;
+            }
+            catch (MissingReferenceException)
+            {
+                return null;
+            }
+        }
+    }
+
+    Transform ITroop.Transform
+    {
+        get
+        {
+            // Safe access - return null if destroyed
+            if (this == null) return null;
+            try
+            {
+                return transform;
+            }
+            catch (MissingReferenceException)
+            {
+                return null;
+            }
+        }
+    }
+    Guid ITroop.TeamID 
+    { 
+        get => Guid.Empty; // Deprecated
+        set { } // Deprecated
+    }
+    TroopStats ITroop.TroopStats => TroopStats;
+    int ITroop.CurrentHealth
+    {
+        get => CurrentHealth;
+        set => CurrentHealth = value;
+    }
+    bool ITroop.IsDead => IsDead;
+    ITroop ITroop.Target
+    {
+        get => Target;
+        set => Target = value as Troop;
+    }
+
+    void ITroop.Initialize()
+    {
+        // Enable AI instead of enabling the script
+        IsAIActive = true;
+
+        // Reset agent in case it was stopped during prep
+        if (_agent != null && _agent.isOnNavMesh)
+        {
+            _agent.isStopped = false;
+        }
+    }
+
+    void ITroop.UpdateTroop()
+    {
+        if (_fsm != null)
+            _fsm.Update();
+
+        OnUpdate();
+    }
+
+    void ITroop.SetTarget(ITroop target)
+    {
+        SetTarget(target as Troop);
+    }
+
+    bool ITroop.IsInRange(ITroop target)
+    {
+        return IsInRange(target as Troop);
+    }
+
+    void ITroop.Attack()
+    {
+        Attack();
+    }
+
+    void ITroop.TakeDamage(int damage)
+    {
+        TakeDamage(damage);
+    }
+
+    void ITroop.Die()
+    {
+        Die();
+    }
 
     void Awake()
     {
@@ -26,11 +124,20 @@ public class Troop : MonoBehaviour
         _agent.updateRotation = false;
         _agent.updateUpAxis = false;
         transform.rotation = Quaternion.identity;
+        
+        // Initialize FSM immediately
+        _fsm = new TroopFSM();
+        _fsm.ChangeState(new IdleState(this));
+        
+        Debug.Log($"[Troop] {name} FSM initialized in Awake");
     }
 
     void Start()
     {
         _agent = GetComponent<NavMeshAgent>();
+        
+        // SAVE original rotation before NavMesh changes it
+        Quaternion originalRotation = transform.rotation;
         
         Vector3 pos = transform.position;
         pos.z = 0f;
@@ -44,7 +151,6 @@ public class Troop : MonoBehaviour
                 Vector3 newPos = hit.position;
                 newPos.z = 0f;
                 transform.position = newPos;
-                Debug.Log($"[Troop] Warped to NavMesh position: {transform.position}");
             }
             else
             {
@@ -61,15 +167,16 @@ public class Troop : MonoBehaviour
         _agent.avoidancePriority = 50;
         _agent.radius = 0.5f;
 
-        _fsm = new TroopFSM();
-        _fsm.ChangeState(new IdleState(this));
+        // FSM ALREADY INITIALIZED IN AWAKE
+        // _fsm = new TroopFSM(); // REMOVE THIS
+        // _fsm.ChangeState(new IdleState(this)); // REMOVE THIS
 
-        // Get animation controller in base class
         _animController = GetComponent<TroopAnimationController>();
 
+        // RESTORE original rotation after NavMesh setup
+        transform.rotation = originalRotation;
+
         OnStart();
-        
-        Debug.Log($"[Troop] {name} initialized with FSM in state: {_fsm.CurrentState?.GetType().Name}");
     }
 
     protected virtual void OnStart()
@@ -78,10 +185,32 @@ public class Troop : MonoBehaviour
 
     void Update()
     {
-        if (_fsm != null)
-            _fsm.Update();
+        // Don't update FSM if dead
+        if (IsDead) return;
         
+        // ONLY update FSM if AI is active
+        if (IsAIActive)
+        {
+            // ENSURE FSM EXISTS
+            EnsureFSMInitialized();
+            
+            if (_fsm != null)
+            {
+                _fsm.Update();
+            }
+        }
+
         OnUpdate();
+    }
+
+    private void EnsureFSMInitialized()
+    {
+        if (_fsm == null)
+        {
+            _fsm = new TroopFSM();
+            _fsm.ChangeState(new IdleState(this));
+            Debug.Log($"[Troop] {name} FSM initialized on demand");
+        }
     }
 
     protected virtual void OnUpdate()
@@ -90,15 +219,19 @@ public class Troop : MonoBehaviour
 
     void LateUpdate()
     {
+        // Don't update position/rotation if dead
+        if (IsDead) return;
+        
         Vector3 pos = transform.position;
         pos.z = 0f;
         transform.position = pos;
-        
+
         Vector3 euler = transform.eulerAngles;
         euler.x = 0f;
         euler.y = 0f;
-        
-        if (Target != null)
+
+        // ONLY rotate to face target if AI is active
+        if (IsAIActive && Target != null && Target.gameObject != null)
         {
             Vector3 direction = (Target.transform.position - transform.position).normalized;
             if (direction.sqrMagnitude > 0.01f)
@@ -107,28 +240,48 @@ public class Troop : MonoBehaviour
                 euler.z = angle;
             }
         }
-        else if (_agent != null && _agent.isOnNavMesh && _agent.velocity.sqrMagnitude > 0.01f)
+        else if (IsAIActive && _agent != null && _agent.enabled && _agent.isOnNavMesh && _agent.velocity.sqrMagnitude > 0.01f)
         {
             float angle = Mathf.Atan2(_agent.velocity.y, _agent.velocity.x) * Mathf.Rad2Deg;
             euler.z = angle;
         }
-        
+
         transform.eulerAngles = euler;
     }
 
     public void SetTarget(Troop target)
     {
+        // Don't accept dead targets
+        if (target != null && (target.IsDead || target.gameObject == null))
+        {
+            Debug.LogWarning($"[Troop] {name} tried to set dead target {target.name}");
+            target = null;
+        }
+        
         Target = target;
+        
+        // ONLY change state if AI is active
+        if (!IsAIActive) return;
+        
+        // ENSURE FSM EXISTS
+        EnsureFSMInitialized();
+        
+        if (_fsm == null)
+        {
+            Debug.LogWarning($"[Troop] {name} FSM is null, cannot set target");
+            return;
+        }
+        
         if (Target != null)
         {
             if (IsInRange(Target))
-                _fsm?.ChangeState(new AttackState(this));
+                _fsm.ChangeState(new AttackState(this));
             else
-                _fsm?.ChangeState(new MoveState(this));
+                _fsm.ChangeState(new MoveState(this));
         }
         else
         {
-            _fsm?.ChangeState(new IdleState(this));
+            _fsm.ChangeState(new IdleState(this));
         }
     }
 
@@ -138,28 +291,12 @@ public class Troop : MonoBehaviour
         return Vector3.Distance(transform.position, target.transform.position) <= TroopStats.AttackRange;
     }
 
-    public void Die()
-    {
-        GlobalEvents.RaiseUnitDied(this);
-        Destroy(gameObject);
-    }
-
-    public virtual void Attack()
-    {
-        if (Target == null || Target.IsDead)
-            return;
-
-        if (_animController != null)
-        {
-            _animController.PlayAttackAnimation();
-        }
-        
-        Target.TakeDamage(TroopStats.Damage);
-    }
-
     public void TakeDamage(int damage)
     {
-        if (IsDead) return; // Early exit if already dead
+        if (IsDead)
+        {
+            return; // Silently ignore damage to dead troops
+        }
         
         CurrentHealth -= damage;
         
@@ -168,10 +305,88 @@ public class Troop : MonoBehaviour
             _animController.PlayHitAnimation();
         }
         
-        if (CurrentHealth <= 0 && !IsDead)
+        if (CurrentHealth <= 0)
         {
-            IsDead = true;
-            Die();
+            Die(); // Call Die() - it will set IsDead
         }
+    }
+
+    public void Die()
+    {
+        if (gameObject == null)
+        {
+            Debug.LogError("[Troop] Die() called but gameObject is null!");
+            return;
+        }
+        
+        Debug.Log($"[Troop] {name} is dying. Health: {CurrentHealth}");
+        
+        IsDead = true; // Set it HERE, not before calling Die()
+        
+        // IMMEDIATELY disable AI
+        IsAIActive = false;
+        
+        // IMMEDIATELY disable collider so it can't be targeted
+        Collider2D col = GetComponent<Collider2D>();
+        if (col != null)
+        {
+            col.enabled = false;
+            Debug.Log($"[Troop] {name} disabled collider");
+        }
+        
+        // IMMEDIATELY hide visuals
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>();
+        foreach (var renderer in renderers)
+        {
+            if (renderer != null)
+            {
+                renderer.enabled = false;
+            }
+        }
+        Debug.Log($"[Troop] {name} disabled {renderers.Length} renderers");
+        
+        // Stop agent
+        if (Agent != null && Agent.enabled && Agent.isOnNavMesh)
+        {
+            Agent.isStopped = true;
+            Agent.velocity = Vector3.zero;
+            Agent.enabled = false;
+            Debug.Log($"[Troop] {name} disabled agent");
+        }
+        
+        // Raise event BEFORE destroying
+        Debug.Log($"[Troop] {name} raising UnitDied event");
+        GlobalEvents.RaiseUnitDied(this);
+        
+        // Delay destruction slightly to ensure event is processed
+        StartCoroutine(DestroyAfterDelay());
+    }
+
+    private System.Collections.IEnumerator DestroyAfterDelay()
+    {
+        yield return null; // Wait one frame
+        Debug.Log($"[Troop] {name} destroying GameObject now");
+        
+        if (gameObject != null)
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    public virtual void Attack()
+    {
+        // ROBUST NULL AND DEAD CHECKS
+        if (Target == null || Target.IsDead || Target.gameObject == null)
+        {
+            Debug.LogWarning($"[Troop] {name} tried to attack invalid target");
+            return;
+        }
+
+        if (_animController != null)
+        {
+            _animController.PlayAttackAnimation();
+        }
+
+        Target.TakeDamage(TroopStats.Damage);
     }
 }

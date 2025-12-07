@@ -49,11 +49,14 @@ public class CloseTroop : Troop
 
     public override void Attack()
     {
+        // IMMEDIATE DEATH CHECK
+        if (IsDead) return;
+        
         if (Target == null || Target.IsDead)
             return;
 
         // Ensure we're completely stopped before attacking
-        if (Agent != null && Agent.isOnNavMesh)
+        if (Agent != null && Agent.enabled && Agent.isOnNavMesh)
         {
             Agent.isStopped = true;
             Agent.velocity = Vector3.zero;
@@ -66,8 +69,6 @@ public class CloseTroop : Troop
         }
 
         Target.TakeDamage(TroopStats.Damage);
-
-        Debug.Log($"[MeleeTroop] {name} attacked {Target.name} for {TroopStats.Damage} damage");
     }
 
     // Override IsInRange with a buffer zone to prevent state thrashing

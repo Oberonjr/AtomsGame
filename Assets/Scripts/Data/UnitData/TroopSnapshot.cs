@@ -1,8 +1,5 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-
 
 [System.Serializable]
 public class TroopSnapshot
@@ -10,7 +7,7 @@ public class TroopSnapshot
     public TroopStats Stats;
     public Vector3 Position;
     public Quaternion Rotation;
-    public Guid TeamID;
+    public int TeamIndex; // CHANGED: From Guid to int
     public int CurrentHealth;
 
     public TroopSnapshot(Troop troop)
@@ -18,7 +15,7 @@ public class TroopSnapshot
         Stats = troop.TroopStats;
         Position = troop.transform.position;
         Rotation = troop.transform.rotation;
-        TeamID = troop.TeamID;
+        TeamIndex = troop.TeamIndex; // CHANGED: Use TeamIndex
         CurrentHealth = troop.CurrentHealth;
     }
 }

@@ -50,6 +50,9 @@ public class FarTroop : Troop
 
     public override void Attack()
     {
+        // IMMEDIATE DEATH CHECK
+        if (IsDead) return;
+        
         if (Target == null || Target.IsDead)
             return;
 
@@ -65,7 +68,7 @@ public class FarTroop : Troop
         // If too close, retreat while shooting
         if (isClose)
         {
-            if (Agent != null && Agent.isOnNavMesh)
+            if (Agent != null && Agent.enabled && Agent.isOnNavMesh)
             {
                 Vector3 retreatDirection = (transform.position - Target.transform.position).normalized;
                 Vector3 retreatTarget = transform.position + retreatDirection * RetreatSpeed;
@@ -81,7 +84,7 @@ public class FarTroop : Troop
         else
         {
             // Stop moving when at safe distance
-            if (Agent != null && Agent.isOnNavMesh)
+            if (Agent != null && Agent.enabled && Agent.isOnNavMesh)
             {
                 Agent.isStopped = true;
             }
@@ -93,6 +96,9 @@ public class FarTroop : Troop
 
     private void PerformRaycastAttack()
     {
+        // IMMEDIATE DEATH CHECK
+        if (IsDead) return;
+        
         if (Target == null || Target.IsDead) return;
 
         Vector3 firePosition = FirePoint != null ? FirePoint.position : transform.position;
@@ -113,10 +119,10 @@ public class FarTroop : Troop
         if (rayHit.collider != null)
         {
             Troop hitTroop = rayHit.collider.GetComponentInParent<Troop>();
-            if (hitTroop != null && hitTroop.TeamID != TeamID && !hitTroop.IsDead)
+            if (hitTroop != null && hitTroop.TeamIndex != TeamIndex && !hitTroop.IsDead)
             {
                 hitTroop.TakeDamage(TroopStats.Damage);
-                Debug.Log($"[FarTroop] Hit {hitTroop.name} for {TroopStats.Damage} damage");
+                
 
                 if (HitEffectPrefab != null)
                 {
