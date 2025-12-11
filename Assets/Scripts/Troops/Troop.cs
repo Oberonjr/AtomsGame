@@ -186,7 +186,27 @@ public class Troop : MonoBehaviour, ITroop, IEquatable<Troop>
         // RESTORE original rotation after NavMesh setup
         transform.rotation = originalRotation;
 
+        // NEW: Add team indicator
+        AddTeamIndicator();
+
         OnStart();
+    }
+
+    private void AddTeamIndicator()
+    {
+        // Check if already has indicator
+        if (GetComponentInChildren<UnitTeamIndicator>() != null)
+            return;
+
+        // Create indicator GameObject
+        GameObject indicator = new GameObject("TeamIndicator");
+        indicator.transform.SetParent(transform);
+        indicator.transform.localPosition = Vector3.zero;
+        indicator.transform.localRotation = Quaternion.identity;
+        
+        // Add components
+        indicator.AddComponent<SpriteRenderer>();
+        indicator.AddComponent<UnitTeamIndicator>();
     }
 
     protected virtual void OnStart()

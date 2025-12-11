@@ -3,7 +3,6 @@ using Udar.SceneManager;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
-using UnityEditor.Build.Content;
 
 public class MainMenu : MonoBehaviour
 {
@@ -19,7 +18,7 @@ public class MainMenu : MonoBehaviour
     [SerializeField] private GameObject _atomsModeIndicator;
 
     [Header("Settings")]
-    [SerializeField] private SceneField _gameScene; 
+    [SerializeField] private SceneField _gameScene;
 
     private SimulationMode _selectedMode = SimulationMode.Unity;
 
@@ -71,19 +70,41 @@ public class MainMenu : MonoBehaviour
         if (_atomsModeIndicator != null)
             _atomsModeIndicator.SetActive(_selectedMode == SimulationMode.Atoms);
 
-        // Update button colors
+        // Update button colors - FIXED: Force immediate visual update
         if (_unityModeButton != null)
         {
-            var colors = _unityModeButton.colors;
-            colors.normalColor = _selectedMode == SimulationMode.Unity ? Color.yellow : Color.white;
+            Color targetColor = _selectedMode == SimulationMode.Unity ? Color.yellow : Color.white;
+            
+            // Update ColorBlock
+            ColorBlock colors = _unityModeButton.colors;
+            colors.normalColor = targetColor;
+            colors.selectedColor = targetColor;
             _unityModeButton.colors = colors;
+            
+            // Force immediate visual update on button's Image component
+            Image buttonImage = _unityModeButton.GetComponent<Image>();
+            if (buttonImage != null)
+            {
+                buttonImage.color = targetColor;
+            }
         }
 
         if (_atomsModeButton != null)
         {
-            var colors = _atomsModeButton.colors;
-            colors.normalColor = _selectedMode == SimulationMode.Atoms ? Color.yellow : Color.white;
+            Color targetColor = _selectedMode == SimulationMode.Atoms ? Color.yellow : Color.white;
+            
+            // Update ColorBlock
+            ColorBlock colors = _atomsModeButton.colors;
+            colors.normalColor = targetColor;
+            colors.selectedColor = targetColor;
             _atomsModeButton.colors = colors;
+            
+            // Force immediate visual update on button's Image component
+            Image buttonImage = _atomsModeButton.GetComponent<Image>();
+            if (buttonImage != null)
+            {
+                buttonImage.color = targetColor;
+            }
         }
     }
 

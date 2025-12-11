@@ -259,7 +259,27 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         
         _animController = GetComponent<TroopAnimationController>();
         
+        // NEW: Add team indicator
+        AddTeamIndicator();
+        
         OnStart();
+    }
+
+    private void AddTeamIndicator()
+    {
+        // Check if already has indicator
+        if (GetComponentInChildren<UnitTeamIndicator>() != null)
+            return;
+
+        // Create indicator GameObject
+        GameObject indicator = new GameObject("TeamIndicator");
+        indicator.transform.SetParent(transform);
+        indicator.transform.localPosition = Vector3.zero;
+        indicator.transform.localRotation = Quaternion.identity;
+        
+        // Add components
+        indicator.AddComponent<SpriteRenderer>();
+        indicator.AddComponent<UnitTeamIndicator>();
     }
     
     void Update()

@@ -31,7 +31,6 @@ public class GameStateManager : MonoBehaviour
     public event Action<GameState> OnStateChanged;
     public event Action<UnitSelectionData> OnUnitSelected;
     public event Action<Team> OnTeamWon;
-    public event Action<bool> OnPauseChanged;
     public event Action OnLayoutCleared;
 
     void Awake()
@@ -204,9 +203,32 @@ public class GameStateManager : MonoBehaviour
         }
         else if (_currentState == GameState.Win)
         {
+            // From win screen - clear everything
             ClearAllTroops();
+            _isPaused = false;
+            Time.timeScale = 1f;
         }
 
+        _inputHandler.Enable();
+        ChangeState(GameState.Prep);
+    }
+
+    // NEW: Return to prep from win screen without clearing layout
+    public void ReturnToPrepFromWin()
+    {
+        if (_currentState != GameState.Win) return;
+
+        Debug.Log("[GameStateManager] Returning to prep from win (preserving layout)");
+        
+        CleanupDestroyedTroops();
+        ClearAllTroops();
+        
+        // Restore the prep state (brings back the original layout)
+        _saveLoadManager.RestorePrepState(_activeTroops, AvailableUnits, _unitSpawner);
+        
+        _isPaused = false;
+        Time.timeScale = 1f;
+        
         _inputHandler.Enable();
         ChangeState(GameState.Prep);
     }
@@ -305,7 +327,8 @@ public class GameStateManager : MonoBehaviour
 
         _isPaused = !_isPaused;
         Time.timeScale = _isPaused ? 0f : 1f;
-        OnPauseChanged?.Invoke(_isPaused);
+        
+        Debug.Log($"[GameStateManager] Game {(_isPaused ? "paused" : "resumed")}");
     }
 
     public void ClearTeam(Guid teamID)

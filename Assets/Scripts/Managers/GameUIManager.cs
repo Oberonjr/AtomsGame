@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
 using System.Collections.Generic;
 
@@ -13,9 +14,14 @@ public class GameUIManager : MonoBehaviour
 
     [Header("Simulate UI")]
     public GameObject SimulateUI;
-    public Button PauseButton;
     public Button BackToPrepButton;
-    public TextMeshProUGUI PauseButtonText;
+    public TextMeshProUGUI SimulateStatusText; // Optional: show "Paused" text
+
+    [Header("Pause Menu UI")]
+    public GameObject PauseMenuPanel;
+    public Button ContinueButton;
+    public Button MainMenuButton;
+    public Button QuitButton;
 
     [Header("Win UI")]
     public GameObject WinUI;
@@ -33,8 +39,8 @@ public class GameUIManager : MonoBehaviour
     public Button SaveLayoutButton;
     public Button LoadLayoutButton;
     public TMP_InputField SaveNameInput;
-    public GameObject SaveLayoutPanel; // ADD THIS
-    public Button ConfirmSaveButton; // ADD THIS
+    public GameObject SaveLayoutPanel;
+    public Button ConfirmSaveButton;
     public GameObject LoadLayoutPanel;
     public Transform LoadLayoutButtonContainer;
     public GameObject LoadLayoutButtonPrefab;
@@ -45,13 +51,15 @@ public class GameUIManager : MonoBehaviour
     public Button ConfirmDeleteYesButton;
     public Button ConfirmDeleteNoButton;
 
+    [Header("Scene Settings")]
+    [SerializeField] private string _mainMenuSceneName = "MainMenu";
+
     private List<Button> _unitButtons = new List<Button>();
     private List<Button> _clearTeamButtons = new List<Button>();
-
     private static GameUIManager _instance;
     public static GameUIManager Instance => _instance;
-
     private string _fileToDelete = null;
+    private bool _wasSimulationPausedBeforeMenu = false;
 
     void Awake()
     {
@@ -74,12 +82,17 @@ public class GameUIManager : MonoBehaviour
             GameStateManager.Instance.OnStateChanged += OnStateChanged;
             GameStateManager.Instance.OnUnitSelected += OnUnitSelected;
             GameStateManager.Instance.OnTeamWon += OnTeamWon;
-            GameStateManager.Instance.OnPauseChanged += OnPauseChanged;
 
             CreateUnitButtons();
-            CreateClearTeamButtons(); // ADD THIS LINE
+            CreateClearTeamButtons();
             SetupButtons();
             OnStateChanged(GameStateManager.Instance.CurrentState);
+            
+            // Ensure pause menu is hidden initially
+            if (PauseMenuPanel != null)
+            {
+                PauseMenuPanel.SetActive(false);
+            }
             
             Debug.Log("[GameUIManager] Initialization complete");
         }
@@ -96,7 +109,6 @@ public class GameUIManager : MonoBehaviour
             GameStateManager.Instance.OnStateChanged -= OnStateChanged;
             GameStateManager.Instance.OnUnitSelected -= OnUnitSelected;
             GameStateManager.Instance.OnTeamWon -= OnTeamWon;
-            GameStateManager.Instance.OnPauseChanged -= OnPauseChanged;
         }
     }
 
@@ -104,39 +116,26 @@ public class GameUIManager : MonoBehaviour
     {
         if (GameStateManager.Instance == null || UnitButtonContainer == null || UnitButtonPrefab == null)
         {
-            Debug.LogError($"[GameUIManager] Cannot create unit buttons - missing references. GameStateManager: {GameStateManager.Instance != null}, UnitButtonContainer: {UnitButtonContainer != null}, UnitButtonPrefab: {UnitButtonPrefab != null}");
+            Debug.LogError($"[GameUIManager] Cannot create unit buttons - missing references");
             return;
         }
 
-        
-
         foreach (var unitData in GameStateManager.Instance.AvailableUnits)
         {
-            if (unitData == null)
-            {
-                Debug.LogWarning("[GameUIManager] Skipping null unitData");
-                continue;
-            }
+            if (unitData == null) continue;
             
             GameObject buttonObj = Instantiate(UnitButtonPrefab, UnitButtonContainer);
             Button button = buttonObj.GetComponent<Button>();
 
             if (button != null)
             {
-                // Setup button visuals
                 TextMeshProUGUI buttonText = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
                 if (buttonText != null)
                 {
                     buttonText.text = unitData.DisplayName;
-                    Debug.Log($"[GameUIManager] Set button text to: {unitData.DisplayName}");
-                }
-                else
-                {
-                    Debug.LogWarning($"[GameUIManager] No TextMeshProUGUI found in button children for: {unitData.DisplayName}");
                 }
 
-                // Try to find icon image on the child of the button
-                Image buttonImage = buttonObj.transform.GetChild(0).GetComponent<Image>();
+                Image buttonImage = buttonObj.transform.GetChild(0)?.GetComponent<Image>();
                 if (buttonImage == null)
                 {
                     buttonImage = buttonObj.GetComponentInChildren<Image>();
@@ -145,26 +144,17 @@ public class GameUIManager : MonoBehaviour
                 if (buttonImage != null && unitData.Icon != null)
                 {
                     buttonImage.sprite = unitData.Icon;
-                    
                 }
 
-                // Setup button click
                 UnitSelectionData capturedData = unitData;
                 button.onClick.AddListener(() =>
                 {
-                    
                     GameStateManager.Instance.SelectUnit(capturedData);
                 });
 
                 _unitButtons.Add(button);
             }
-            else
-            {
-                Debug.LogError($"[GameUIManager] UnitButtonPrefab does not have a Button component!");
-            }
         }
-        
-       
     }
 
     private void CreateClearTeamButtons()
@@ -199,62 +189,54 @@ public class GameUIManager : MonoBehaviour
                     buttonImage.color = color;
                 }
 
-                int teamIndex = i; // Capture index instead of GUID
+                int teamIndex = i;
                 button.onClick.AddListener(() => OnClearTeamClicked(teamIndex));
 
                 _clearTeamButtons.Add(button);
             }
         }
-
-       
     }
 
     private void SetupButtons()
     {
-        
-        
+        // Prep buttons
         if (SimulateButton != null)
             SimulateButton.onClick.AddListener(() => GameStateManager.Instance.StartSimulation());
-        else
-            Debug.LogWarning("[GameUIManager] SimulateButton is null!");
 
-        if (PauseButton != null)
-            PauseButton.onClick.AddListener(() => GameStateManager.Instance.TogglePause());
-        else
-            Debug.LogWarning("[GameUIManager] PauseButton is null!");
-
+        // Simulate buttons
         if (BackToPrepButton != null)
             BackToPrepButton.onClick.AddListener(() => GameStateManager.Instance.ReturnToPrep());
-        else
-            Debug.LogWarning("[GameUIManager] BackToPrepButton is null!");
 
+        // Pause Menu buttons
+        if (ContinueButton != null)
+            ContinueButton.onClick.AddListener(OnContinueClicked);
+
+        if (MainMenuButton != null)
+            MainMenuButton.onClick.AddListener(OnMainMenuClicked);
+
+        if (QuitButton != null)
+            QuitButton.onClick.AddListener(OnQuitClicked);
+
+        // Win buttons
         if (RestartButton != null)
             RestartButton.onClick.AddListener(() => GameStateManager.Instance.RestartSimulation());
-        else
-            Debug.LogWarning("[GameUIManager] RestartButton is null!");
 
         if (BackToPrepFromWinButton != null)
-            BackToPrepFromWinButton.onClick.AddListener(() => GameStateManager.Instance.ReturnToPrep());
-        else
-            Debug.LogWarning("[GameUIManager] BackToPrepFromWinButton is null!");
+            BackToPrepFromWinButton.onClick.AddListener(() => GameStateManager.Instance.ReturnToPrepFromWin());
 
         // Team management buttons
         if (ClearAllButton != null)
             ClearAllButton.onClick.AddListener(OnClearAllClicked);
-        else
-            Debug.LogWarning("[GameUIManager] ClearAllButton is null!");
 
         // Save/load buttons
         if (SaveLayoutButton != null)
             SaveLayoutButton.onClick.AddListener(OnSaveLayoutClicked);
 
         if (ConfirmSaveButton != null)
-            ConfirmSaveButton.onClick.AddListener(OnConfirmSaveClicked); // ADD THIS
+            ConfirmSaveButton.onClick.AddListener(OnConfirmSaveClicked);
 
         if (LoadLayoutButton != null)
             LoadLayoutButton.onClick.AddListener(OnLoadLayoutClicked);
-        else
-            Debug.LogWarning("[GameUIManager] LoadLayoutButton is null!");
 
         // Delete confirmation buttons
         if (ConfirmDeleteYesButton != null)
@@ -272,20 +254,14 @@ public class GameUIManager : MonoBehaviour
         if (SimulateUI != null) SimulateUI.SetActive(newState == GameState.Simulate);
         if (WinUI != null) WinUI.SetActive(newState == GameState.Win);
 
-        // Close panels when leaving prep
-        if (newState != GameState.Prep)
-        {
-            if (LoadLayoutPanel != null)
-                LoadLayoutPanel.SetActive(false);
-            if (SaveLayoutPanel != null)
-                SaveLayoutPanel.SetActive(false);
-        }
+        // Close all panels when changing states
+        if (LoadLayoutPanel != null) LoadLayoutPanel.SetActive(false);
+        if (SaveLayoutPanel != null) SaveLayoutPanel.SetActive(false);
+        if (PauseMenuPanel != null) PauseMenuPanel.SetActive(false);
     }
 
     private void OnUnitSelected(UnitSelectionData unit)
     {
-       
-        
         // Visual feedback for selected unit
         for (int i = 0; i < _unitButtons.Count; i++)
         {
@@ -296,8 +272,11 @@ public class GameUIManager : MonoBehaviour
                 colors.normalColor = Color.white;
                 button.colors = colors;
                 
-                // Force visual refresh
-                button.GetComponent<Image>().color = Color.white;
+                Image buttonImage = button.GetComponent<Image>();
+                if (buttonImage != null)
+                {
+                    buttonImage.color = Color.white;
+                }
             }
         }
 
@@ -305,21 +284,19 @@ public class GameUIManager : MonoBehaviour
         {
             int index = GameStateManager.Instance.AvailableUnits.IndexOf(unit);
             
-            
             if (index >= 0 && index < _unitButtons.Count)
             {
                 Button selectedButton = _unitButtons[index];
                 ColorBlock colors = selectedButton.colors;
                 colors.normalColor = Color.yellow;
+                colors.selectedColor = Color.yellow;
                 selectedButton.colors = colors;
                 
-                // Force immediate visual update
-                selectedButton.GetComponent<Image>().color = Color.yellow;
-                
-            }
-            else
-            {
-                Debug.LogWarning($"[GameUIManager] Index out of range: {index} (button count: {_unitButtons.Count})");
+                Image buttonImage = selectedButton.GetComponent<Image>();
+                if (buttonImage != null)
+                {
+                    buttonImage.color = Color.yellow;
+                }
             }
         }
     }
@@ -332,7 +309,6 @@ public class GameUIManager : MonoBehaviour
         {
             if (winner == null)
             {
-                // Draw
                 WinnerText.text = "Draw!";
                 WinnerText.color = Color.white;
                 if (WinnerColorDisplay != null)
@@ -342,7 +318,6 @@ public class GameUIManager : MonoBehaviour
             }
             else
             {
-                // Team won - find team index
                 int teamIndex = TeamManager.Instance != null ? TeamManager.Instance.Teams.IndexOf(winner) : -1;
                 string teamName = teamIndex >= 0 ? $"Team {teamIndex + 1}" : "Team";
                 
@@ -356,16 +331,104 @@ public class GameUIManager : MonoBehaviour
         }
     }
 
-    private void OnPauseChanged(bool isPaused)
+    // PAUSE MENU HANDLERS
+    public void ShowPauseMenu()
     {
-        Debug.Log($"[GameUIManager] Pause state changed: {isPaused}");
-        
-        if (PauseButtonText != null)
+        if (PauseMenuPanel == null) return;
+
+        // Remember current game state for proper resume behavior
+        if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState == GameState.Simulate)
         {
-            PauseButtonText.text = isPaused ? "Resume" : "Pause";
+            _wasSimulationPausedBeforeMenu = GameStateManager.Instance.IsPaused;
         }
+        else
+        {
+            // Not in simulate state - don't need to track pause
+            _wasSimulationPausedBeforeMenu = false;
+        }
+
+        // Freeze game
+        Time.timeScale = 0f;
+        
+        PauseMenuPanel.SetActive(true);
+        
+        Debug.Log($"[GameUIManager] Pause menu shown in {GameStateManager.Instance?.CurrentState} state (was paused: {_wasSimulationPausedBeforeMenu})");
     }
 
+    public void HidePauseMenu()
+    {
+        if (PauseMenuPanel == null) return;
+
+        PauseMenuPanel.SetActive(false);
+
+        // Only resume time if:
+        // 1. We're in simulate state AND simulation wasn't paused before menu
+        // 2. OR we're in any other state (prep, win) - just resume normally
+        if (GameStateManager.Instance != null)
+        {
+            if (GameStateManager.Instance.CurrentState == GameState.Simulate)
+            {
+                // Only resume if wasn't paused before
+                if (!_wasSimulationPausedBeforeMenu)
+                {
+                    Time.timeScale = 1f;
+                }
+            }
+            else
+            {
+                // Always resume in other states
+                Time.timeScale = 1f;
+            }
+        }
+        else
+        {
+            // Fallback - just resume
+            Time.timeScale = 1f;
+        }
+
+        Debug.Log($"[GameUIManager] Pause menu hidden (timescale: {Time.timeScale})");
+    }
+
+    public bool IsPauseMenuActive()
+    {
+        return PauseMenuPanel != null && PauseMenuPanel.activeSelf;
+    }
+
+    private void OnContinueClicked()
+    {
+        Debug.Log("[GameUIManager] Continue clicked");
+        HidePauseMenu();
+    }
+
+    private void OnMainMenuClicked()
+    {
+        Debug.Log("[GameUIManager] Main Menu clicked");
+        
+        // Unpause game time
+        Time.timeScale = 1f;
+        
+        // Destroy SimulationConfig so user can select mode again
+        if (SimulationConfig.Instance != null)
+        {
+            Destroy(SimulationConfig.Instance.gameObject);
+        }
+        
+        // Load main menu scene
+        SceneManager.LoadScene(_mainMenuSceneName);
+    }
+
+    private void OnQuitClicked()
+    {
+        Debug.Log("[GameUIManager] Quit clicked");
+        
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    // OTHER BUTTON HANDLERS
     private void OnClearTeamClicked(int teamIndex)
     {
         Debug.Log($"[GameUIManager] Clear team button clicked: Team {teamIndex}");
@@ -386,7 +449,6 @@ public class GameUIManager : MonoBehaviour
         {
             SaveLayoutPanel.SetActive(!SaveLayoutPanel.activeSelf);
             
-            // Clear input field when opening
             if (SaveLayoutPanel.activeSelf && SaveNameInput != null)
             {
                 SaveNameInput.text = "";
@@ -398,12 +460,11 @@ public class GameUIManager : MonoBehaviour
     {
         string layoutName = SaveNameInput != null && !string.IsNullOrEmpty(SaveNameInput.text)
             ? SaveNameInput.text
-            : $"Layout_{System.DateTime.Now:yyMMdd_HHmmss}"; // Changed format: yyMMdd_HHmmss
+            : $"Layout_{System.DateTime.Now:yyMMdd_HHmmss}";
 
         Debug.Log($"[GameUIManager] Confirm save clicked: {layoutName}");
         GameStateManager.Instance?.SaveCurrentLayout(layoutName);
 
-        // Close panel and clear input
         if (SaveLayoutPanel != null)
         {
             SaveLayoutPanel.SetActive(false);
@@ -450,7 +511,6 @@ public class GameUIManager : MonoBehaviour
         {
             GameObject buttonObj = Instantiate(LoadLayoutButtonPrefab, LoadLayoutButtonContainer);
             
-            // Assume prefab has: Button (load), Button (delete), TextMeshProUGUI (label)
             Button[] buttons = buttonObj.GetComponentsInChildren<Button>();
             TextMeshProUGUI label = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
 
@@ -462,7 +522,6 @@ public class GameUIManager : MonoBehaviour
 
             if (buttons.Length >= 1)
             {
-                // First button = Load
                 Button loadButton = buttons[0];
                 string path = filePath;
                 loadButton.onClick.AddListener(() =>
@@ -474,7 +533,6 @@ public class GameUIManager : MonoBehaviour
 
             if (buttons.Length >= 2)
             {
-                // Second button = Delete
                 Button deleteButton = buttons[1];
                 string path = filePath;
                 string fileName = System.IO.Path.GetFileNameWithoutExtension(filePath);
@@ -505,7 +563,6 @@ public class GameUIManager : MonoBehaviour
             System.IO.File.Delete(_fileToDelete);
             Debug.Log($"[GameUIManager] Deleted layout: {_fileToDelete}");
             
-            // Refresh list
             PopulateLoadLayoutButtons();
         }
 
@@ -528,61 +585,101 @@ public class GameUIManager : MonoBehaviour
     public bool ArePanelsActive()
     {
         return (SaveLayoutPanel != null && SaveLayoutPanel.activeSelf) ||
-               (LoadLayoutPanel != null && LoadLayoutPanel.activeSelf);
+               (LoadLayoutPanel != null && LoadLayoutPanel.activeSelf) ||
+               (PauseMenuPanel != null && PauseMenuPanel.activeSelf);
     }
 
     void Update()
     {
         if (GameStateManager.Instance == null) return;
 
-        // Unit selection shortcuts (1-3)
-        if (Input.GetKeyDown(KeyCode.Alpha1) && GameStateManager.Instance.AvailableUnits.Count > 0)
-        {
-            GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[0]);
-        }
-        if (Input.GetKeyDown(KeyCode.Alpha2) && GameStateManager.Instance.AvailableUnits.Count > 1)
-        {
-            GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[1]);
-        }
-        if (Input.GetKeyDown(KeyCode.Alpha3) && GameStateManager.Instance.AvailableUnits.Count > 2)
-        {
-            GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[2]);
-        }
-
-        // Start simulation (Space)
-        if (Input.GetKeyDown(KeyCode.Space) && GameStateManager.Instance.CurrentState == GameState.Prep)
-        {
-            GameStateManager.Instance.StartSimulation();
-        }
-
-        // Save layout (S) - only if save panel is not showing
-        if (Input.GetKeyDown(KeyCode.S) && GameStateManager.Instance.CurrentState == GameState.Prep && 
-            (SaveLayoutPanel == null || !SaveLayoutPanel.activeSelf))
-        {
-            OnSaveLayoutClicked();
-        }
-
-        // Load layout (L) - only if panels are not showing
-        if (Input.GetKeyDown(KeyCode.L) && GameStateManager.Instance.CurrentState == GameState.Prep && 
-            (SaveLayoutPanel == null || !SaveLayoutPanel.activeSelf) &&
-            (LoadLayoutPanel == null || !LoadLayoutPanel.activeSelf))
-        {
-            OnLoadLayoutClicked();
-        }
-
-        // Clear all teams (C)
-        if (Input.GetKeyDown(KeyCode.C) && GameStateManager.Instance.CurrentState == GameState.Prep)
-        {
-            OnClearAllClicked();
-        }
-
-        // Close panels (Escape)
+        // ESC key - Show/hide pause menu at ANY time (not just simulate/win)
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            // If pause menu is showing, close it
+            if (IsPauseMenuActive())
+            {
+                HidePauseMenu();
+                return;
+            }
+            
+            // Close prep panels first (if any are open)
             if (SaveLayoutPanel != null && SaveLayoutPanel.activeSelf)
+            {
                 SaveLayoutPanel.SetActive(false);
+                return;
+            }
             if (LoadLayoutPanel != null && LoadLayoutPanel.activeSelf)
+            {
                 LoadLayoutPanel.SetActive(false);
+                return;
+            }
+            if (ConfirmDeletePanel != null && ConfirmDeletePanel.activeSelf)
+            {
+                ConfirmDeletePanel.SetActive(false);
+                return;
+            }
+            
+            // Show pause menu (works in any state)
+            ShowPauseMenu();
+            return;
+        }
+
+        // Don't process other shortcuts if panels are active
+        if (ArePanelsActive()) return;
+
+        // SPACEBAR - Pause/Resume during simulation OR start simulation in prep
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            if (GameStateManager.Instance.CurrentState == GameState.Simulate)
+            {
+                GameStateManager.Instance.TogglePause();
+            }
+            else if (GameStateManager.Instance.CurrentState == GameState.Prep)
+            {
+                GameStateManager.Instance.StartSimulation();
+            }
+        }
+
+        // R - Return to Prep during simulation
+        if (Input.GetKeyDown(KeyCode.R) && GameStateManager.Instance.CurrentState == GameState.Simulate)
+        {
+            GameStateManager.Instance.ReturnToPrep();
+        }
+
+        // Unit selection shortcuts (1-3) - Prep only
+        if (GameStateManager.Instance.CurrentState == GameState.Prep)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha1) && GameStateManager.Instance.AvailableUnits.Count > 0)
+            {
+                GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[0]);
+            }
+            if (Input.GetKeyDown(KeyCode.Alpha2) && GameStateManager.Instance.AvailableUnits.Count > 1)
+            {
+                GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[1]);
+            }
+            if (Input.GetKeyDown(KeyCode.Alpha3) && GameStateManager.Instance.AvailableUnits.Count > 2)
+            {
+                GameStateManager.Instance.SelectUnit(GameStateManager.Instance.AvailableUnits[2]);
+            }
+
+            // S - Save layout
+            if (Input.GetKeyDown(KeyCode.S))
+            {
+                OnSaveLayoutClicked();
+            }
+
+            // L - Load layout
+            if (Input.GetKeyDown(KeyCode.L))
+            {
+                OnLoadLayoutClicked();
+            }
+
+            // C - Clear all teams
+            if (Input.GetKeyDown(KeyCode.C))
+            {
+                OnClearAllClicked();
+            }
         }
     }
 }

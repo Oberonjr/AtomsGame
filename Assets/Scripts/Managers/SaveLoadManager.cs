@@ -199,7 +199,6 @@ public class SaveLoadManager : MonoBehaviour
         
         activeTroops.Clear();
 
-        // Determine which mode to use
         bool useAtoms = SimulationConfig.Instance != null && 
                         SimulationConfig.Instance.Mode == SimulationMode.Atoms;
 
@@ -207,18 +206,32 @@ public class SaveLoadManager : MonoBehaviour
         {
             if (snapshot == null) continue;
             
-            // CHANGED: Match by TroopType from SNAPSHOT, not from prefab
             UnitSelectionData unitData = availableUnits.Find(u =>
             {
                 if (u == null) return false;
                 
                 if (useAtoms && u.TroopPrefab_Atoms != null)
                 {
-                    // Access the prefab's instancer Base (not instantiated object)
                     var statsInstancer = u.TroopPrefab_Atoms.GetComponent<TroopStats_AtomsVariableInstancer>();
-                    if (statsInstancer != null && statsInstancer.Base != null)
+                    if (statsInstancer != null)
                     {
-                        return statsInstancer.Base.Value.TroopType == snapshot.TroopType;
+                        // ADDED: Try Base first, fallback to Variable if Base is null
+                        if (statsInstancer.Base != null && statsInstancer.Base.Value.TroopType != TroopType.MELEE)
+                        {
+                            return statsInstancer.Base.Value.TroopType == snapshot.TroopType;
+                        }
+                        else if (statsInstancer.Variable != null && statsInstancer.Variable.Value.TroopType != TroopType.MELEE)
+                        {
+                            return statsInstancer.Variable.Value.TroopType == snapshot.TroopType;
+                        }
+                        else
+                        {
+                            // ADDED: Last resort - check prefab name
+                            string prefabName = u.TroopPrefab_Atoms.name.ToLower();
+                            return (snapshot.TroopType == TroopType.MELEE && prefabName.Contains("close")) ||
+                                   (snapshot.TroopType == TroopType.RANGED && prefabName.Contains("far")) ||
+                                   (snapshot.TroopType == TroopType.ARTILLERY && prefabName.Contains("artillery"));
+                        }
                     }
                     return false;
                 }
@@ -231,7 +244,25 @@ public class SaveLoadManager : MonoBehaviour
 
             if (unitData == null)
             {
-                Debug.LogWarning($"[SaveLoadManager] Could not find unit data for TroopType: {snapshot.TroopType}");
+                Debug.LogWarning($"[SaveLoadManager] Could not find unit data for TroopType: {snapshot.TroopType} in {(useAtoms ? "Atoms" : "Unity")} mode");
+                
+                // ADDED: Log available prefabs for debugging
+                Debug.LogWarning($"[SaveLoadManager] Available Atoms prefabs:");
+                foreach (var u in availableUnits)
+                {
+                    if (u != null && u.TroopPrefab_Atoms != null)
+                    {
+                        var statsInstancer = u.TroopPrefab_Atoms.GetComponent<TroopStats_AtomsVariableInstancer>();
+                        if (statsInstancer != null && statsInstancer.Base != null)
+                        {
+                            Debug.LogWarning($"  - {u.DisplayName}: {statsInstancer.Base.Value.TroopType}");
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"  - {u.DisplayName}: NO BASE ASSIGNED");
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -248,10 +279,6 @@ public class SaveLoadManager : MonoBehaviour
             if (troop != null)
             {
                 SetTeamIndex(troop, snapshot.TeamIndex);
-                
-                // CHANGED: Set health after a frame to allow Awake() to run
-                // For now, just set it directly - Awake() initializes it from stats anyway
-                // troop.CurrentHealth will be set in Start() from stats, then we can override
                 
                 ITeam team = TeamManager.Instance?.GetTeamByIndex(snapshot.TeamIndex);
                 if (team != null)
