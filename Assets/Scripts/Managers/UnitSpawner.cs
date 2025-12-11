@@ -18,51 +18,72 @@ public class UnitSpawner : MonoBehaviour
     /// </summary>
     public ITroop SpawnTroop(UnitSelectionData unitData, Vector3 position, TeamArea teamArea, ITeam team)
     {
-        if (unitData?.TroopPrefab == null)
+        // Determine which prefab to use based on SimulationConfig
+        SimulationMode mode = SimulationMode.Unity; // Default
+        if (SimulationConfig.Instance != null)
         {
-            Debug.LogError("[UnitSpawner] Cannot spawn - unitData or TroopPrefab is null!");
+            mode = SimulationConfig.Instance.Mode;
+        }
+        
+        GameObject prefabToSpawn = null;
+        
+        if (mode == SimulationMode.Atoms && unitData.TroopPrefab_Atoms != null)
+        {
+            prefabToSpawn = unitData.TroopPrefab_Atoms.gameObject;
+        }
+        else if (unitData.TroopPrefab != null)
+        {
+            prefabToSpawn = unitData.TroopPrefab.gameObject;
+        }
+        
+        if (prefabToSpawn == null)
+        {
+            Debug.LogError($"[UnitSpawner] No prefab assigned for {unitData.DisplayName} in {mode} mode");
             return null;
         }
-
-        // Adjust position for 2D
-        position.z = 0f;
-
-        // Sample NavMesh
-        if (NavMesh.SamplePosition(position, out NavMeshHit navHit, NAVMESH_SAMPLE_DISTANCE, NavMesh.AllAreas))
+        
+        Quaternion spawnRotation = GetSpawnRotation(teamArea);
+        GameObject troopObj = Instantiate(prefabToSpawn, position, spawnRotation);
+        
+        if (troopObj == null)
         {
-            position = navHit.position;
-            position.z = 0f;
+            Debug.LogError("[UnitSpawner] Failed to instantiate prefab");
+            return null;
         }
-
-        // Calculate spawn rotation
-        Quaternion spawnRotation = CalculateSpawnRotation(teamArea);
-
-        // Instantiate troop
-        Troop troop = Instantiate(unitData.TroopPrefab, position, spawnRotation);
-
+        
+        // Position correction
+        Vector3 finalPos = troopObj.transform.position;
+        finalPos.z = 0f;
+        troopObj.transform.position = finalPos;
+        troopObj.transform.rotation = spawnRotation;
+        
+        ITroop troop = troopObj.GetComponent<ITroop>() as ITroop;
+        
         if (troop != null)
         {
-            // Position correction
-            Vector3 finalPos = troop.transform.position;
-            finalPos.z = 0f;
-            troop.transform.position = finalPos;
-            troop.transform.rotation = spawnRotation;
-
-            // Setup troop - use team index
-            troop.IsAIActive = false;
-            troop.TeamIndex = team.TeamIndex; // CHANGED: Use index instead of GUID
-
-            // Register to team
+            // Set team index based on type
+            if (troop is Troop unityTroop)
+            {
+                unityTroop.TeamIndex = team.TeamIndex;
+                Debug.Log($"[UnitSpawner] Spawned Unity {unitData.DisplayName} for team {team.TeamIndex}");
+            }
+            else if (troop is Troop_Atoms atomsTroop)
+            {
+                atomsTroop.TeamIndex = team.TeamIndex;
+                Debug.Log($"[UnitSpawner] Spawned Atoms {unitData.DisplayName} for team {team.TeamIndex}");
+            }
+            
             team.RegisterUnit(troop);
-
-            // Notify listeners
             OnTroopSpawned?.Invoke(troop);
-
-            Debug.Log($"[UnitSpawner] Spawned {unitData.DisplayName} for team {team.TeamIndex}");
+            
             return troop;
         }
-
-        return null;
+        else
+        {
+            Debug.LogError($"[UnitSpawner] Spawned prefab has no ITroop component!");
+            Destroy(troopObj);
+            return null;
+        }
     }
 
     /// <summary>
@@ -98,7 +119,7 @@ public class UnitSpawner : MonoBehaviour
         }
     }
 
-    private Quaternion CalculateSpawnRotation(TeamArea spawnArea)
+    private Quaternion GetSpawnRotation(TeamArea spawnArea)
     {
         if (TeamManager.Instance == null || spawnArea == null)
         {

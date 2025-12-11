@@ -3,12 +3,12 @@ using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent))]
-public class Troop : MonoBehaviour, ITroop
+public class Troop : MonoBehaviour, ITroop, IEquatable<Troop>
 {
     public TroopStats TroopStats;
     [HideInInspector] public int CurrentHealth;
     [HideInInspector] public Troop Target;
-    [HideInInspector] public int TeamIndex; // CHANGED: From Guid to int
+    [HideInInspector] public int TeamIndex;
     [HideInInspector] public bool IsDead = false;
     [HideInInspector] public bool IsAIActive = false; // NEW: Controls AI behavior
 
@@ -55,11 +55,13 @@ public class Troop : MonoBehaviour, ITroop
             }
         }
     }
-    Guid ITroop.TeamID 
-    { 
-        get => Guid.Empty; // Deprecated
-        set { } // Deprecated
+    
+    int ITroop.TeamIndex // CHANGED: Property instead of Guid
+    {
+        get => TeamIndex;
+        set => TeamIndex = value;
     }
+    
     TroopStats ITroop.TroopStats => TroopStats;
     int ITroop.CurrentHealth
     {
@@ -117,6 +119,14 @@ public class Troop : MonoBehaviour, ITroop
     {
         Die();
     }
+
+    // NEW: Direct stat access (just forward to TroopStats)
+    int ITroop.GetMaxHealth() => TroopStats?.MaxHealth ?? 100;
+    int ITroop.GetDamage() => TroopStats?.Damage ?? 10;
+    float ITroop.GetAttackRange() => TroopStats?.AttackRange ?? 2f;
+    float ITroop.GetAttackCooldown() => TroopStats?.AttackCooldown ?? 1f;
+    float ITroop.GetMoveSpeed() => TroopStats?.MoveSpeed ?? 3.5f;
+    float ITroop.GetInitialAttackDelay() => TroopStats?.InitialAttackDelay ?? 0.3f;
 
     void Awake()
     {
@@ -321,12 +331,10 @@ public class Troop : MonoBehaviour, ITroop
         
         Debug.Log($"[Troop] {name} is dying. Health: {CurrentHealth}");
         
-        IsDead = true; // Set it HERE, not before calling Die()
-        
-        // IMMEDIATELY disable AI
+        IsDead = true;
         IsAIActive = false;
         
-        // IMMEDIATELY disable collider so it can't be targeted
+        // Disable collider - NO NULL CONDITIONAL
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
         {
@@ -334,7 +342,7 @@ public class Troop : MonoBehaviour, ITroop
             Debug.Log($"[Troop] {name} disabled collider");
         }
         
-        // IMMEDIATELY hide visuals
+        // Hide visuals
         SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>();
         foreach (var renderer in renderers)
         {
@@ -354,11 +362,10 @@ public class Troop : MonoBehaviour, ITroop
             Debug.Log($"[Troop] {name} disabled agent");
         }
         
-        // Raise event BEFORE destroying
+        // Raise event
         Debug.Log($"[Troop] {name} raising UnitDied event");
         GlobalEvents.RaiseUnitDied(this);
         
-        // Delay destruction slightly to ensure event is processed
         StartCoroutine(DestroyAfterDelay());
     }
 
@@ -388,5 +395,21 @@ public class Troop : MonoBehaviour, ITroop
         }
 
         Target.TakeDamage(TroopStats.Damage);
+    }
+
+    public bool Equals(Troop other)
+    {
+        if (other == null) return false;
+        return this.GetInstanceID() == other.GetInstanceID();
+    }
+
+    public override bool Equals(object obj)
+    {
+        return Equals(obj as Troop);
+    }
+
+    public override int GetHashCode()
+    {
+        return GetInstanceID().GetHashCode();
     }
 }

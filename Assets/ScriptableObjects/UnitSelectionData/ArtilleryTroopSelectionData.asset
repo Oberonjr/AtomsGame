@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 509b6b636edeacd41b64faafae290314, type: 3}
+  m_Name: ArtilleryTroopSelectionData
+  m_EditorClassIdentifier: 
+  DisplayName: Artillery
+  Icon: {fileID: 21300000, guid: 9a6e136cf0267fd4d942f7729acc7ae2, type: 3}
+  TroopPrefab: {fileID: 2077368662897684294, guid: 0a80cbb8336e72d4fa15f98b07ba59da, type: 3}
+  TroopPrefab_Atoms: {fileID: 6267264051465474752, guid: bdb8f3fd41153db43a4c60213c4cac91, type: 3}

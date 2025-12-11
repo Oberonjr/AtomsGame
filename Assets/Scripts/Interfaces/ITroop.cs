@@ -1,5 +1,4 @@
 using UnityEngine;
-using System;
 
 /// <summary>
 /// Interface for all troop implementations (Unity and Atoms)
@@ -9,8 +8,16 @@ public interface ITroop
     // Identity
     GameObject GameObject { get; }
     Transform Transform { get; }
-    Guid TeamID { get; set; }
-    TroopStats TroopStats { get; }
+    int TeamIndex { get; set; } // CHANGED: Use int instead of Guid
+
+    // Stats access
+    TroopStats TroopStats { get; } // Deprecated for Atoms, but kept for compatibility
+    int GetMaxHealth();
+    int GetDamage();
+    float GetAttackRange();
+    float GetAttackCooldown();
+    float GetMoveSpeed();
+    float GetInitialAttackDelay();
 
     // State
     int CurrentHealth { get; set; }

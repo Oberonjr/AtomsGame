@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 509b6b636edeacd41b64faafae290314, type: 3}
+  m_Name: CloseTroopSelectionData
+  m_EditorClassIdentifier: 
+  DisplayName: Melee
+  Icon: {fileID: 21300000, guid: d517f80af2fa6a544a7c867c828bdb26, type: 3}
+  TroopPrefab: {fileID: 3939638611916526468, guid: ff2c54d14b2d73b42a2a19ba1534d42c, type: 3}
+  TroopPrefab_Atoms: {fileID: -6430469336161369080, guid: dda1297152ade874db4ce06f63800c92, type: 3}

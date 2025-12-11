@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 341b824e83598444894d0ab16d2f9bb5, type: 3}
+  m_Name: MeleeStats
+  m_EditorClassIdentifier: 
+  _developerDescription: 
+  _id: 
+  _value:
+    TroopType: 0
+    MaxHealth: {fileID: 0}
+    Damage: {fileID: 0}
+    AttackRange: {fileID: 0}
+    AttackCooldown: {fileID: 0}
+    MoveSpeed: {fileID: 0}
+    InitialAttackDelay: {fileID: 0}
+  _changed: {fileID: 0}
+  _changedWithHistory: {fileID: 0}
+  _triggerChangedOnOnEnable: 0
+  _triggerChangedWithHistoryOnOnEnable: 0
+  _oldValue:
+    TroopType: 0
+    MaxHealth: {fileID: 0}
+    Damage: {fileID: 0}
+    AttackRange: {fileID: 0}
+    AttackCooldown: {fileID: 0}
+    MoveSpeed: {fileID: 0}
+    InitialAttackDelay: {fileID: 0}
+  _initialValue:
+    TroopType: 0
+    MaxHealth: {fileID: 11400000, guid: 3ece4c84546342d479cf681e98dc25ae, type: 2}
+    Damage: {fileID: 11400000, guid: 0c2ea132b3f33644c9b752ecf826dba4, type: 2}
+    AttackRange: {fileID: 11400000, guid: 7aca57c1374be3d4080d82cfccce104a, type: 2}
+    AttackCooldown: {fileID: 11400000, guid: cbf2eeda11723a845a3e2e8e1a780830, type: 2}
+    MoveSpeed: {fileID: 11400000, guid: 1b18736d999b44f45b4f9c444fba59cd, type: 2}
+    InitialAttackDelay: {fileID: 11400000, guid: eda5309ccbed24b49ba3d896b2188f2d, type: 2}
+  _preChangeTransformers: []

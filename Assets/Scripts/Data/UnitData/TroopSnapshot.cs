@@ -4,18 +4,28 @@ using UnityEngine;
 [System.Serializable]
 public class TroopSnapshot
 {
-    public TroopStats Stats;
+    public TroopType TroopType; // CHANGED: Use enum instead of TroopStats reference
     public Vector3 Position;
     public Quaternion Rotation;
-    public int TeamIndex; // CHANGED: From Guid to int
+    public int TeamIndex;
     public int CurrentHealth;
 
-    public TroopSnapshot(Troop troop)
+    public TroopSnapshot(ITroop troop)
     {
-        Stats = troop.TroopStats;
-        Position = troop.transform.position;
-        Rotation = troop.transform.rotation;
-        TeamIndex = troop.TeamIndex; // CHANGED: Use TeamIndex
+        // Get TroopType from ITroop (works for both)
+        if (troop is Troop unityTroop && unityTroop.TroopStats != null)
+        {
+            TroopType = unityTroop.TroopStats.TroopType;
+            TeamIndex = unityTroop.TeamIndex;
+        }
+        else if (troop is Troop_Atoms atomsTroop)
+        {
+            TroopType = atomsTroop.Stats.TroopType;
+            TeamIndex = atomsTroop.TeamIndex;
+        }
+
+        Position = troop.Transform.position;
+        Rotation = troop.Transform.rotation;
         CurrentHealth = troop.CurrentHealth;
     }
 }

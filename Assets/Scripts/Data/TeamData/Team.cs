@@ -4,20 +4,20 @@ using UnityEngine;
 using AYellowpaper.SerializedCollections;
 
 [System.Serializable]
-public class Team : ITeam
+public class Team : ITeam, IEquatable<Team>
 {
-    [SerializeField] private int _teamIndex; // NEW: Simple integer index
+    [SerializeField] private int _teamIndex;
     [SerializeField] private Color _teamColor = Color.white;
     [SerializeField] private TeamArea _area;
 
-    public SerializedDictionary<TroopStats, List<Troop>> Units = new SerializedDictionary<TroopStats, List<Troop>>();
+    // CHANGED: Initialize immediately to prevent null
+    public Dictionary<TroopType, List<ITroop>> Units = new Dictionary<TroopType, List<ITroop>>();
 
     // Events
     public event Action<Color> OnTeamColorChanged;
 
     // Properties
-    public int TeamIndex => _teamIndex; // NEW: Expose team index
-    public Guid ID => Guid.Empty; // DEPRECATED: Keep for interface compatibility, but unused
+    public int TeamIndex => _teamIndex;
     public Color TeamColor
     {
         get => _teamColor;
@@ -32,15 +32,10 @@ public class Team : ITeam
     }
     public TeamArea Area => _area;
 
-    // IMPLEMENT ITeam INTERFACE
-    Guid ITeam.ID => Guid.Empty; // Deprecated
-    Color ITeam.TeamColor 
-    { 
-        get => _teamColor; 
-        set => TeamColor = value; 
-    }
+    // IMPLEMENT ITeam INTERFACE (no ID property)
+    Color ITeam.TeamColor { get => _teamColor; set => TeamColor = value; }
     TeamArea ITeam.Area => _area;
-    int ITeam.TeamIndex => _teamIndex; // ADD THIS
+    int ITeam.TeamIndex => _teamIndex;
 
     int ITeam.TotalUnits()
     {
@@ -49,18 +44,12 @@ public class Team : ITeam
 
     void ITeam.RegisterUnit(ITroop troop)
     {
-        if (troop is Troop troopMono)
-        {
-            RegisterUnit(troopMono);
-        }
+        RegisterUnit(troop);
     }
 
     void ITeam.OnUnitDied(ITroop troop)
     {
-        if (troop is Troop troopMono)
-        {
-            OnUnitDied(troopMono);
-        }
+        OnUnitDied(troop);
     }
 
     void ITeam.ClearUnits()
@@ -72,7 +61,7 @@ public class Team : ITeam
     {
         foreach (var kvp in Units)
         {
-            foreach (Troop troop in kvp.Value)
+            foreach (ITroop troop in kvp.Value)
             {
                 yield return troop;
             }
@@ -83,6 +72,14 @@ public class Team : ITeam
     public Team(int teamIndex)
     {
         _teamIndex = teamIndex;
+        // ADDED: Ensure Units is initialized
+        Units = new Dictionary<TroopType, List<ITroop>>();
+    }
+    
+    // ADDED: Parameterless constructor for serialization
+    public Team()
+    {
+        Units = new Dictionary<TroopType, List<ITroop>>();
     }
 
     // EXISTING METHODS
@@ -95,61 +92,72 @@ public class Team : ITeam
         }
     }
 
-    public void RegisterUnit(Troop troop)
+    // UNIFIED RegisterUnit - works for both Unity and Atoms
+    public void RegisterUnit(ITroop troop)
     {
-        if (troop == null || troop.TroopStats == null)
+        if (troop == null)
         {
-            Debug.LogWarning("[Team] Attempted to register null troop or troop without stats");
+            Debug.LogWarning("[Team] Attempted to register null ITroop");
             return;
         }
 
-        if (!Units.ContainsKey(troop.TroopStats))
+        // ADDED: Check GameObject before accessing it
+        if (troop.GameObject == null)
         {
-            Units[troop.TroopStats] = new List<Troop>();
-            Debug.Log($"[Team] Created new list for {troop.TroopStats.name}");
+            Debug.LogWarning("[Team] Attempted to register troop with null GameObject");
+            return;
         }
 
-        if (!Units[troop.TroopStats].Contains(troop))
+        // Get TroopType from the troop
+        TroopType type = GetTroopType(troop);
+
+        if (!Units.ContainsKey(type))
         {
-            Units[troop.TroopStats].Add(troop);
-            Debug.Log($"[Team] Registered {troop.name} ({troop.TroopStats.name}). Total: {TotalUnits()}");
+            Units[type] = new List<ITroop>();
+            Debug.Log($"[Team {_teamIndex}] Created new list for {type}");
+        }
+
+        if (!Units[type].Contains(troop))
+        {
+            Units[type].Add(troop);
+            // FIXED: Safe null check
+            string troopName = troop.GameObject != null ? troop.GameObject.name : "Unknown";
+            Debug.Log($"[Team {_teamIndex}] Registered {type} troop ({troopName}). Total: {TotalUnits()}");
         }
         else
         {
-            Debug.LogWarning($"[Team] Troop {troop.name} already registered");
+            string troopName = troop.GameObject != null ? troop.GameObject.name : "Unknown";
+            Debug.LogWarning($"[Team {_teamIndex}] Troop {troopName} already registered");
         }
     }
 
-    public void OnUnitDied(Troop troop)
+    // UNIFIED OnUnitDied - works for both Unity and Atoms
+    public void OnUnitDied(ITroop troop)
     {
-        if (troop == null || troop.TroopStats == null)
+        if (troop == null)
         {
-            Debug.LogWarning("[Team] OnUnitDied called with null troop or stats");
+            Debug.LogWarning("[Team] OnUnitDied called with null ITroop");
             return;
         }
 
-        Debug.Log($"[Team] OnUnitDied called for {troop.name} ({troop.TroopStats.name})");
+        TroopType type = GetTroopType(troop);
 
-        if (Units.ContainsKey(troop.TroopStats))
+        if (Units.ContainsKey(type))
         {
-            bool removed = Units[troop.TroopStats].Remove(troop);
-            Debug.Log($"[Team] Removed from list: {removed}. Remaining in this stats category: {Units[troop.TroopStats].Count}");
-            
+            bool removed = Units[type].Remove(troop);
+            Debug.Log($"[Team {_teamIndex}] Unit died ({troop.GameObject?.name}). Removed: {removed}. Remaining: {TotalUnits()}");
+
             // Clean up empty lists
-            if (Units[troop.TroopStats].Count == 0)
+            if (Units[type].Count == 0)
             {
-                Units.Remove(troop.TroopStats);
-                Debug.Log($"[Team] Removed empty list for {troop.TroopStats.name}");
+                Units.Remove(type);
+                Debug.Log($"[Team {_teamIndex}] Removed empty list for {type}");
             }
         }
         else
         {
-            Debug.LogWarning($"[Team] Units dictionary does not contain key: {troop.TroopStats.name}");
+            Debug.LogWarning($"[Team {_teamIndex}] Units dictionary does not contain key: {type}");
         }
-        
-        // NEW: Log final count
-        int total = TotalUnits();
-        Debug.Log($"[Team] Team {TeamIndex} now has {total} total units");
     }
 
     public int TotalUnits()
@@ -171,6 +179,43 @@ public class Team : ITeam
     public void ClearUnits()
     {
         Units.Clear();
-        Debug.Log("[Team] All units cleared");
+        Debug.Log($"[Team {_teamIndex}] All units cleared");
+    }
+
+    // Helper method to get TroopType from ITroop
+    private TroopType GetTroopType(ITroop troop)
+    {
+        // Try Unity Troop first
+        if (troop is Troop unityTroop && unityTroop.TroopStats != null)
+        {
+            return unityTroop.TroopStats.TroopType;
+        }
+        
+        // Try Atoms Troop
+        if (troop is Troop_Atoms atomsTroop)
+        {
+            return atomsTroop.Stats.TroopType;
+        }
+
+        // Fallback
+        Debug.LogWarning($"[Team] Could not determine TroopType for {troop.GameObject?.name}, defaulting to MELEE");
+        return TroopType.MELEE;
+    }
+
+    // IEquatable implementation (KEPT)
+    public bool Equals(Team other)
+    {
+        if (other == null) return false;
+        return _teamIndex == other._teamIndex;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return Equals(obj as Team);
+    }
+
+    public override int GetHashCode()
+    {
+        return _teamIndex.GetHashCode();
     }
 }

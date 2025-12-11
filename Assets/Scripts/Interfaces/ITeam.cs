@@ -1,5 +1,4 @@
 using UnityEngine;
-using System;
 using System.Collections.Generic;
 
 /// <summary>
@@ -7,8 +6,7 @@ using System.Collections.Generic;
 /// </summary>
 public interface ITeam
 {
-    Guid ID { get; } // Deprecated but kept for compatibility
-    int TeamIndex { get; } // NEW: Primary identifier
+    int TeamIndex { get; } // Primary identifier
     Color TeamColor { get; set; }
     TeamArea Area { get; }
 

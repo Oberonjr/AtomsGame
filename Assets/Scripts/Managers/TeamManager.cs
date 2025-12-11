@@ -16,8 +16,6 @@ public class TeamManager : MonoBehaviour
         if (_instance == null)
         {
             _instance = this;
-            
-            // ENSURE TEAM INDICES ARE SET
             ValidateTeamIndices();
         }
         else if (_instance != this)
@@ -43,7 +41,6 @@ public class TeamManager : MonoBehaviour
         {
             if (Teams[i] != null)
             {
-                // Use reflection to set team index if not already set
                 var field = typeof(Team).GetField("_teamIndex", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 if (field != null)
                 {
@@ -54,7 +51,8 @@ public class TeamManager : MonoBehaviour
         }
     }
 
-    private void OnUnitDied(Troop troop)
+    // CHANGED: ITroop parameter instead of Troop
+    private void OnUnitDied(ITroop troop)
     {
         if (troop == null)
         {
@@ -62,18 +60,26 @@ public class TeamManager : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[TeamManager] OnUnitDied called for {troop.name}, TeamIndex: {troop.TeamIndex}");
+        // Get team index from troop (works for both Unity and Atoms)
+        int teamIndex = GetTeamIndexFromTroop(troop);
 
-        // Find team by index instead of GUID
-        Team team = GetTeamByIndex(troop.TeamIndex);
+        if (teamIndex < 0)
+        {
+            Debug.LogError($"[TeamManager] Could not determine team index for {troop.GameObject?.name}");
+            return;
+        }
+
+        Debug.Log($"[TeamManager] OnUnitDied called for {troop.GameObject?.name}, TeamIndex: {teamIndex}");
+
+        Team team = GetTeamByIndex(teamIndex);
         if (team != null)
         {
             Debug.Log($"[TeamManager] Found team {team.TeamIndex}, removing unit");
             team.OnUnitDied(troop);
-            
+
             int remainingUnits = team.TotalUnits();
             Debug.Log($"[TeamManager] Team {team.TeamIndex} has {remainingUnits} units remaining");
-            
+
             if (remainingUnits == 0)
             {
                 Debug.Log($"[TeamManager] Team {team.TeamIndex} defeated! Raising TeamDefeated event");
@@ -82,8 +88,23 @@ public class TeamManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"[TeamManager] Could not find team for index: {troop.TeamIndex}");
+            Debug.LogError($"[TeamManager] Could not find team for index: {teamIndex}");
         }
+    }
+
+    // Helper to get team index from ITroop
+    private int GetTeamIndexFromTroop(ITroop troop)
+    {
+        if (troop is Troop unityTroop)
+        {
+            return unityTroop.TeamIndex;
+        }
+        else if (troop is Troop_Atoms atomsTroop)
+        {
+            return atomsTroop.TeamIndex;
+        }
+
+        return -1;
     }
 
     public void CheckTeamStatus(Team team)
@@ -97,7 +118,6 @@ public class TeamManager : MonoBehaviour
         }
     }
 
-    // NEW: Helper methods
     public Team GetTeamByIndex(int index)
     {
         if (index >= 0 && index < Teams.Count)

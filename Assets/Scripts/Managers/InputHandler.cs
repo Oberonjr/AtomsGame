@@ -108,14 +108,21 @@ public class InputHandler : MonoBehaviour
         
         if (hit.collider != null)
         {
-            Troop troop = hit.collider.GetComponentInParent<Troop>();
+            // Try both types
+            ITroop troop = hit.collider.GetComponentInParent<Troop>() as ITroop;
+            
+            if (troop == null)
+            {
+                troop = hit.collider.GetComponentInParent<Troop_Atoms>() as ITroop;
+            }
+            
             if (troop != null)
             {
                 OnRemoveUnitRequested?.Invoke(troop);
             }
             else
             {
-                Debug.LogWarning($"[InputHandler] No Troop component found on {hit.collider.name}");
+                Debug.LogWarning($"[InputHandler] No ITroop component found on {hit.collider.name}");
             }
         }
     }

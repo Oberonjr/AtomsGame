@@ -59,10 +59,11 @@ public class ArtilleryTroop : Troop
 
         if (rocket != null)
         {
+            // CHANGED: Pass ITroop (this) instead of Troop
             rocket.Initialize(
-                Target, 
-                TroopStats.Damage, 
-                TeamIndex, // CHANGED: From TeamID to TeamIndex
+                Target as ITroop, // Cast to ITroop
+                TroopStats.Damage,
+                TeamIndex,
                 RocketInitialStraightTime,
                 RocketInitialSpeed,
                 RocketMaxSpeed,
@@ -75,7 +76,6 @@ public class ArtilleryTroop : Troop
                 RocketExplosionEffectPrefab,
                 VFXDesignRadius
             );
-            Debug.Log($"[ArtilleryTroop] Fired rocket at {Target.name}");
         }
     }
 }

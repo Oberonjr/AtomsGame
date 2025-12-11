@@ -13,9 +13,9 @@ public class BattleLayout
 [Serializable]
 public class SavedTroop
 {
-    public string TroopStatsName;
+    public string TroopTypeName; // CHANGED: Store TroopType enum as string
     public Vector3 Position;
     public Quaternion Rotation;
-    public int TeamIndex; // CHANGED: From TeamID string to int
+    public int TeamIndex;
     public int CurrentHealth;
 }

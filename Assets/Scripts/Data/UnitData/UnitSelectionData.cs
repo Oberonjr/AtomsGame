@@ -1,11 +1,16 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-[System.Serializable]
-public class UnitSelectionData
+[CreateAssetMenu(fileName = "Unit Selection Data", menuName = "Unit Selection")]
+public class UnitSelectionData : ScriptableObject
 {
-    public Troop TroopPrefab;
-    public Sprite Icon;
+    [Header("Display")]
     public string DisplayName;
+    public Sprite Icon;
+    
+    [Header("Unity Implementation")]
+    public Troop TroopPrefab;
+    
+    [Header("Atoms Implementation")]    
+    public Troop_Atoms TroopPrefab_Atoms;
 }
+

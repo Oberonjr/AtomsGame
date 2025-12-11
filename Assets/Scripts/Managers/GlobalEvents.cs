@@ -3,9 +3,10 @@ using UnityEngine;
 
 public static class GlobalEvents
 {
-    public static event Action<Troop> UnitDied;
+    // CHANGED: Use ITroop instead of Troop
+    public static event Action<ITroop> UnitDied;
 
-    public static void RaiseUnitDied(Troop troop)
+    public static void RaiseUnitDied(ITroop troop)
     {
         if (troop == null)
         {
@@ -13,7 +14,8 @@ public static class GlobalEvents
             return;
         }
         
-        Debug.Log($"[GlobalEvents] Raising UnitDied event for {troop.name}. Subscribers: {UnitDied?.GetInvocationList().Length ?? 0}");
+        string troopName = troop.GameObject != null ? troop.GameObject.name : "Unknown";
+        Debug.Log($"[GlobalEvents] Raising UnitDied event for {troopName}. Subscribers: {UnitDied?.GetInvocationList().Length ?? 0}");
         UnitDied?.Invoke(troop);
     }
 }

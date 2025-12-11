@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 341b824e83598444894d0ab16d2f9bb5, type: 3}
+  m_Name: ArtilleryStats
+  m_EditorClassIdentifier: 
+  _developerDescription: 
+  _id: 
+  _value:
+    TroopType: 0
+    MaxHealth: {fileID: 0}
+    Damage: {fileID: 0}
+    AttackRange: {fileID: 0}
+    AttackCooldown: {fileID: 0}
+    MoveSpeed: {fileID: 0}
+    InitialAttackDelay: {fileID: 0}
+  _changed: {fileID: 0}
+  _changedWithHistory: {fileID: 0}
+  _triggerChangedOnOnEnable: 0
+  _triggerChangedWithHistoryOnOnEnable: 0
+  _oldValue:
+    TroopType: 0
+    MaxHealth: {fileID: 0}
+    Damage: {fileID: 0}
+    AttackRange: {fileID: 0}
+    AttackCooldown: {fileID: 0}
+    MoveSpeed: {fileID: 0}
+    InitialAttackDelay: {fileID: 0}
+  _initialValue:
+    TroopType: 2
+    MaxHealth: {fileID: 11400000, guid: cdd52c2ba61c0bf4494ba2c88b819a4e, type: 2}
+    Damage: {fileID: 11400000, guid: 3bf9f55b85f389c459e6b3e9c57d019b, type: 2}
+    AttackRange: {fileID: 11400000, guid: 911aacaa43538294cab16917d5f556be, type: 2}
+    AttackCooldown: {fileID: 11400000, guid: baacfd67833eb004290f2f7b9fc6c208, type: 2}
+    MoveSpeed: {fileID: 11400000, guid: 38e9fa66171027f45ae6d6def988f9a8, type: 2}
+    InitialAttackDelay: {fileID: 11400000, guid: 5dbe82f50eacdd14cb99d42fc4b7fa2a, type: 2}
+  _preChangeTransformers: []

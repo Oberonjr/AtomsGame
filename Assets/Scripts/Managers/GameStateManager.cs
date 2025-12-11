@@ -102,46 +102,98 @@ public class GameStateManager : MonoBehaviour
         OnUnitSelected?.Invoke(unit);
     }
 
+
+
     public void StartSimulation()
     {
         if (_currentState != GameState.Prep) return;
 
         _saveLoadManager.SavePrepState(_activeTroops);
 
-        // Enable AI for all troops
-        foreach (ITroop troop in _activeTroops)
+        // Determine mode - DEFAULT TO UNITY
+        SimulationMode mode = SimulationMode.Unity; // Default
+        if (SimulationConfig.Instance != null)
         {
-            Troop troopMono = troop as Troop;
-            if (troopMono != null)
-            {
-                troopMono.IsAIActive = true;
-            }
+            mode = SimulationConfig.Instance.Mode;
         }
-
-        // Assign targets immediately
-        if (CombatManager.Instance != null)
+        
+        Debug.Log($"[GameStateManager] Starting simulation in {mode} mode");
+        
+        if (mode == SimulationMode.Atoms)
         {
-            CombatManager.Instance.AssignInitialTargets();
+            StartAtomsSimulation();
+        }
+        else
+        {
+            StartUnitySimulation();
         }
 
         _inputHandler.Disable();
         ChangeState(GameState.Simulate);
     }
 
+    private void StartUnitySimulation()
+    {
+        if (CombatManager.Instance == null)
+        {
+            Debug.LogError("[GameStateManager] CombatManager.Instance is null!");
+            return;
+        }
+        
+        CombatManager.Instance.Initialize();
+        
+        // Enable AI for Unity troops
+        foreach (ITroop troop in _activeTroops)
+        {
+            Troop unityTroop = troop as Troop;
+            if (unityTroop != null)
+            {
+                unityTroop.IsAIActive = true;
+            }
+        }
+        
+        CombatManager.Instance.AssignInitialTargets();
+    }
+
+    private void StartAtomsSimulation()
+    {
+        if (CombatManager_Atoms.Instance == null)
+        {
+            Debug.LogError("[GameStateManager] CombatManager_Atoms.Instance is null!");
+            return;
+        }
+        
+        CombatManager_Atoms.Instance.Initialize();
+        
+        // Just enable AI - no need to register (TeamManager already has them)
+        foreach (ITroop troop in _activeTroops)
+        {
+            Troop_Atoms atomsTroop = troop as Troop_Atoms;
+            if (atomsTroop != null)
+            {
+                atomsTroop.IsAIActive = true;
+            }
+        }
+        
+        CombatManager_Atoms.Instance.AssignInitialTargets();
+    }
+
     public void ReturnToPrep()
     {
-        // NEW: Clean up destroyed references first
         CleanupDestroyedTroops();
 
         if (_currentState == GameState.Simulate)
         {
-            // Disable AI for remaining troops
+            // Disable AI for remaining troops (both types)
             foreach (ITroop troop in _activeTroops)
             {
-                Troop troopMono = troop as Troop;
-                if (troopMono != null && troopMono.gameObject != null) // NULL CHECK
+                if (troop is Troop unityTroop && unityTroop != null && unityTroop.gameObject != null)
                 {
-                    troopMono.IsAIActive = false;
+                    unityTroop.IsAIActive = false;
+                }
+                else if (troop is Troop_Atoms atomsTroop && atomsTroop != null && atomsTroop.gameObject != null)
+                {
+                    atomsTroop.IsAIActive = false;
                 }
             }
             
@@ -165,36 +217,86 @@ public class GameStateManager : MonoBehaviour
 
         Debug.Log("[GameStateManager] Restarting simulation");
         
-        // Clean up any destroyed references
-        CleanupDestroyedTroops();
+        // Start coroutine to handle destruction timing
+        StartCoroutine(RestartSimulationCoroutine());
+    }
 
-        // Destroy remaining troops
+    private System.Collections.IEnumerator RestartSimulationCoroutine()
+    {
+        Debug.Log("[GameStateManager] RestartSimulationCoroutine started");
+        
+        CleanupDestroyedTroops();
         ClearAllTroops();
         
-        // Restore from snapshot
+        // Wait one frame for destruction to complete
+        yield return null;
+        Debug.Log("[GameStateManager] Destruction complete, restoring prep state");
+        
+        // Restore prep state
         _saveLoadManager.RestorePrepState(_activeTroops, AvailableUnits, _unitSpawner);
         
-        // Enable AI for ALL restored troops
+        // Determine which mode to use
+        SimulationMode mode = SimulationMode.Unity;
+        if (SimulationConfig.Instance != null)
+        {
+            mode = SimulationConfig.Instance.Mode;
+        }
+        
+        Debug.Log($"[GameStateManager] Restored {_activeTroops.Count} troops in {mode} mode");
+        
+        // Enable AI for restored troops
         int enabledCount = 0;
         foreach (ITroop troop in _activeTroops)
         {
-            Troop troopMono = troop as Troop;
-            if (troopMono != null && troopMono.gameObject != null) // NULL CHECK
+            if (troop == null)
             {
-                troopMono.IsAIActive = true;
-                enabledCount++;
+                Debug.LogWarning("[GameStateManager] Null troop in active list");
+                continue;
+            }
+            
+            if (troop is Troop unityTroop && mode == SimulationMode.Unity)
+            {
+                if (unityTroop.gameObject != null)
+                {
+                    unityTroop.IsAIActive = true;
+                    enabledCount++;
+                }
+            }
+            else if (troop is Troop_Atoms atomsTroop && mode == SimulationMode.Atoms)
+            {
+                if (atomsTroop.gameObject != null)
+                {
+                    atomsTroop.IsAIActive = true;
+                    enabledCount++;
+                }
             }
         }
         
-        Debug.Log($"[GameStateManager] Enabled AI for {enabledCount} troops");
+        Debug.Log($"[GameStateManager] Enabled AI for {enabledCount}/{_activeTroops.Count} troops");
         
-        // Assign targets
-        if (CombatManager.Instance != null)
+        // Wait another frame to ensure all troops are initialized
+        yield return null;
+        
+        // Assign targets using correct manager
+        if (mode == SimulationMode.Unity && CombatManager.Instance != null)
         {
+            Debug.Log("[GameStateManager] Initializing Unity CombatManager");
+            CombatManager.Instance.Initialize();
             CombatManager.Instance.AssignInitialTargets();
+        }
+        else if (mode == SimulationMode.Atoms && CombatManager_Atoms.Instance != null)
+        {
+            Debug.Log("[GameStateManager] Initializing Atoms CombatManager");
+            CombatManager_Atoms.Instance.Initialize();
+            CombatManager_Atoms.Instance.AssignInitialTargets();
+        }
+        else
+        {
+            Debug.LogError($"[GameStateManager] No combat manager found for {mode} mode!");
         }
 
         ChangeState(GameState.Simulate);
+        Debug.Log("[GameStateManager] RestartSimulation complete");
     }
 
     public void TogglePause()
@@ -235,12 +337,12 @@ public class GameStateManager : MonoBehaviour
         OnLayoutCleared?.Invoke();
     }
 
-    public void SaveCurrentLayout(string layoutName)
+    public void SaveCurrentLayout(String layoutName)
     {
         _saveLoadManager.SaveLayout(layoutName, _activeTroops);
     }
 
-    public void LoadLayout(string filePath)
+    public void LoadLayout(String filePath)
     {
         if (_currentState != GameState.Prep)
         {
@@ -346,12 +448,6 @@ public class GameStateManager : MonoBehaviour
         return TeamManager.Instance.Teams.Find(t => t?.Area == area);
     }
 
-    private ITeam FindTeamByID(Guid id)
-    {
-        // Deprecated - use FindTeamByIndex instead
-        return null;
-    }
-
     private ITeam FindTeamByIndex(int index)
     {
         return TeamManager.Instance?.GetTeamByIndex(index);
@@ -410,12 +506,16 @@ public class GameStateManager : MonoBehaviour
             // Unity's == operator handles destroyed objects
             if (troop == null) return true;
             
-            // Cast to MonoBehaviour to use Unity's null check
-            Troop troopMono = troop as Troop;
-            if (troopMono == null) return true; // Handles destroyed case
-            
-            // Check IsDead
-            if (troopMono.IsDead) return true;
+            // Check Unity Troop
+            if (troop is Troop unityTroop)
+            {
+                if (unityTroop == null || unityTroop.IsDead) return true;
+            }
+            // Check Atoms Troop
+            else if (troop is Troop_Atoms atomsTroop)
+            {
+                if (atomsTroop == null || atomsTroop.IsDead) return true;
+            }
             
             return false;
         });
@@ -432,6 +532,8 @@ public class GameStateManager : MonoBehaviour
         _currentState = newState;
         OnStateChanged?.Invoke(newState);
     }
+
+
 
     void Update()
     {

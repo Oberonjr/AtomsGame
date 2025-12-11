@@ -2565,15 +2565,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   AvailableUnits:
-  - TroopPrefab: {fileID: 2077368662897684294, guid: 0a80cbb8336e72d4fa15f98b07ba59da, type: 3}
-    Icon: {fileID: 21300000, guid: 9a6e136cf0267fd4d942f7729acc7ae2, type: 3}
-    DisplayName: Artillery
-  - TroopPrefab: {fileID: 3939638611916526468, guid: ff2c54d14b2d73b42a2a19ba1534d42c, type: 3}
-    Icon: {fileID: 21300000, guid: d517f80af2fa6a544a7c867c828bdb26, type: 3}
-    DisplayName: Melee
-  - TroopPrefab: {fileID: 2776329306341420953, guid: 31aa17a07ca0e4940a5923b5a646153c, type: 3}
-    Icon: {fileID: 21300000, guid: 52a834bc8035d5e4fa1091bad3dee762, type: 3}
-    DisplayName: Ranged
+  - {fileID: 11400000, guid: d11bbd1db2b705d45b4175e64169d8a7, type: 2}
+  - {fileID: 11400000, guid: 4228b20bffd7f0346bbeaa3a9dccebeb, type: 2}
+  - {fileID: 11400000, guid: 4232fea8c7319e64a95a1c04338749e6, type: 2}
 --- !u!114 &928070336
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5281,7 +5275,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 15
+  orthographic size: 20
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -5569,14 +5563,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Teams:
-  - _teamColor: {r: 0, g: 0.12156868, b: 1, a: 1}
+  - _teamIndex: 0
+    _teamColor: {r: 0, g: 0.12156868, b: 1, a: 1}
     _area: {fileID: 978634502}
-    Units:
-      _serializedList: []
-  - _teamColor: {r: 1, g: 0, b: 0, a: 1}
+  - _teamIndex: 0
+    _teamColor: {r: 1, g: 0, b: 0, a: 1}
     _area: {fileID: 721523283}
-    Units:
-      _serializedList: []
 --- !u!1 &1802034630
 GameObject:
   m_ObjectHideFlags: 0
@@ -6132,6 +6124,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1950174058}
   - component: {fileID: 1950174059}
+  - component: {fileID: 1950174061}
+  - component: {fileID: 1950174060}
   m_Layer: 0
   m_Name: CombatManager
   m_TagString: Untagged
@@ -6161,12 +6155,42 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1950174057}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 88098e4932609ff4a974fcd575fa402c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  TargetUpdateInterval: 1
+  _targetUpdateInterval: 1
+--- !u!114 &1950174060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1950174057}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8609d8e0834878e468617fd88569f94d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _unityCombatManager: {fileID: 1950174059}
+  _atomsCombatManager: {fileID: 1950174061}
+--- !u!114 &1950174061
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1950174057}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 899b32554cd51d04eb3dac9aa1e3aa8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _onCombatStart: {fileID: 11400000, guid: 66f7e3173d99f7a4bbda37f0cddfc2e4, type: 2}
+  _onCombatEnd: {fileID: 11400000, guid: 1241d4d66d95eff4d956cd48f28aaf72, type: 2}
+  _onTargetAssigned: {fileID: 11400000, guid: 7332e728e97a91b4499adfc930c06083, type: 2}
+  _targetUpdateInterval: 1
 --- !u!1 &1953556798
 GameObject:
   m_ObjectHideFlags: 0

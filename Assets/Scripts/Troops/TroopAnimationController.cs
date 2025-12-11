@@ -4,7 +4,7 @@ public class TroopAnimationController : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Animator _animator;
-    private Troop _troop;
+    private ITroop _troop;
 
     [Header("Movement Animation Parameters (Bools)")]
     [SerializeField] private string _runParameterName = "isRunning";
@@ -31,20 +31,28 @@ public class TroopAnimationController : MonoBehaviour
     void Awake()
     {
         if (_animator == null)
+        {
             _animator = GetComponent<Animator>();
-        _troop = GetComponent<Troop>();
+        }
+
+        _troop = GetComponent<ITroop>() as ITroop;
         
-        // Validate animator parameters
+        if (_troop == null)
+        {
+            Debug.LogError($"[TroopAnimationController] {name} has no ITroop component!");
+        }
+
         ValidateAnimatorParameters();
     }
-
+    
     void Update()
     {
-        if (_animator == null || _troop == null) return;
-
-        UpdateMovementAnimation();
+        if (_animator != null && _troop != null)
+        {
+            UpdateMovementAnimation();
+        }
     }
-
+    
     private void ValidateAnimatorParameters()
     {
         if (_animator == null)
@@ -52,38 +60,54 @@ public class TroopAnimationController : MonoBehaviour
             Debug.LogError($"[AnimController] {gameObject.name} has no Animator!");
             return;
         }
-
-        
     }
 
     private void UpdateMovementAnimation()
     {
-        if (_troop.Agent == null) return;
-
-        bool isMoving = _troop.Agent.velocity.sqrMagnitude > 0.01f;
-
-        switch (_troop.TroopStats.TroopType)
+        if (_troop.IsDead) return;
+        
+        UnityEngine.AI.NavMeshAgent agent = null;
+        
+        if (_troop is Troop unityTroop)
         {
-            case TroopType.ARTILLERY:
-                if (HasParameter(_walkParameterName))
-                    _animator.SetBool(_walkParameterName, isMoving);
-                else
-                    Debug.LogWarning($"[AnimController] Missing parameter: {_walkParameterName}");
-                break;
-            default:
-                if (HasParameter(_runParameterName))
-                    _animator.SetBool(_runParameterName, isMoving);
-                else
-                    Debug.LogWarning($"[AnimController] Missing parameter: {_runParameterName}");
-                break;
+            agent = unityTroop.Agent;
+        }
+        else if (_troop is Troop_Atoms atomsTroop)
+        {
+            agent = atomsTroop.Agent;
+        }
+        
+        if (agent == null || !agent.isOnNavMesh) return;
+
+        bool isMoving = agent.velocity.sqrMagnitude > 0.1f;
+
+        if (HasParameter(_runParameterName))
+        {
+            _animator.SetBool(_runParameterName, isMoving);
+        }
+
+        if (HasParameter(_walkParameterName))
+        {
+            _animator.SetBool(_walkParameterName, isMoving);
         }
     }
-
+    
     public void PlayAttackAnimation()
     {
-        if (_animator == null) return;
+        if (_animator == null || _troop == null || _troop.IsDead) return;
 
-        switch (_troop.TroopStats.TroopType)
+        TroopType type = TroopType.MELEE;
+        
+        if (_troop is Troop unityTroop && unityTroop.TroopStats != null)
+        {
+            type = unityTroop.TroopStats.TroopType;
+        }
+        else if (_troop is Troop_Atoms atomsTroop)
+        {
+            type = atomsTroop.Stats.TroopType;
+        }
+
+        switch (type)
         {
             case TroopType.MELEE:
                 PlayMeleeAttack();
@@ -101,7 +125,6 @@ public class TroopAnimationController : MonoBehaviour
     {
         string attackParam = _useThrust ? _attackThrustParameterName : _attackSlashParameterName;
         
-        
         if (HasParameter(attackParam))
         {
             _animator.SetTrigger(attackParam);
@@ -117,10 +140,12 @@ public class TroopAnimationController : MonoBehaviour
     {
         if (_troop.Target == null) return;
 
-        bool isClose = Vector3.Distance(_troop.transform.position, _troop.Target.transform.position) < _closeRangeDistance;
+        // FIXED: Use ITroop.Transform property
+        Vector3 targetPosition = _troop.Target.Transform.position;
+        Vector3 troopPosition = _troop.Transform.position;
+        
+        bool isClose = Vector3.Distance(troopPosition, targetPosition) < _closeRangeDistance;
         string attackParam = isClose ? _hipFireParameterName : _aimedShotParameterName;
-        
-        
         
         if (HasParameter(attackParam))
         {
@@ -134,8 +159,6 @@ public class TroopAnimationController : MonoBehaviour
 
     private void PlayArtilleryAttack()
     {
-        
-        
         if (HasParameter(_aimRocketParameterName))
         {
             _animator.SetTrigger(_aimRocketParameterName);
@@ -151,8 +174,6 @@ public class TroopAnimationController : MonoBehaviour
     {
         if (_animator != null)
         {
-            
-            
             if (HasParameter(_fireRocketParameterName))
             {
                 _animator.SetTrigger(_fireRocketParameterName);
@@ -168,8 +189,6 @@ public class TroopAnimationController : MonoBehaviour
     {
         if (_animator != null)
         {
-            
-            
             if (HasParameter(_hitParameterName))
             {
                 _animator.SetTrigger(_hitParameterName);
