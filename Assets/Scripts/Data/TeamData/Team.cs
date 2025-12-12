@@ -101,7 +101,7 @@ public class Team : ITeam, IEquatable<Team>
             return;
         }
 
-        // ADDED: Check GameObject before accessing it
+        // Check GameObject before accessing it
         if (troop.GameObject == null)
         {
             Debug.LogWarning("[Team] Attempted to register troop with null GameObject");
@@ -120,7 +120,6 @@ public class Team : ITeam, IEquatable<Team>
         if (!Units[type].Contains(troop))
         {
             Units[type].Add(troop);
-            // FIXED: Safe null check
             string troopName = troop.GameObject != null ? troop.GameObject.name : "Unknown";
             Debug.Log($"[Team {_teamIndex}] Registered {type} troop ({troopName}). Total: {TotalUnits()}");
         }
@@ -218,4 +217,24 @@ public class Team : ITeam, IEquatable<Team>
     {
         return _teamIndex.GetHashCode();
     }
+
+    public IEnumerable<ITroop> GetAllUnits()
+    {
+        if (Units == null) yield break;
+        
+        foreach (var kvp in Units)
+        {
+            if (kvp.Value == null) continue;
+            
+            foreach (ITroop troop in kvp.Value)
+            {
+                if (troop != null)
+                {
+                    yield return troop;
+                }
+            }
+        }
+    }
+
+    
 }

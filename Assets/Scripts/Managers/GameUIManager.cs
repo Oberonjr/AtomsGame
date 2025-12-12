@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 using System.Collections.Generic;
+using Udar.SceneManager;
 
 public class GameUIManager : MonoBehaviour
 {
@@ -15,6 +16,8 @@ public class GameUIManager : MonoBehaviour
     [Header("Simulate UI")]
     public GameObject SimulateUI;
     public Button BackToPrepButton;
+    public Button PauseResumeButton; // ADDED: Reference to pause/resume button
+    public TextMeshProUGUI PauseResumeButtonText; // ADDED: Reference to button text
     public TextMeshProUGUI SimulateStatusText; // Optional: show "Paused" text
 
     [Header("Pause Menu UI")]
@@ -52,7 +55,7 @@ public class GameUIManager : MonoBehaviour
     public Button ConfirmDeleteNoButton;
 
     [Header("Scene Settings")]
-    [SerializeField] private string _mainMenuSceneName = "MainMenu";
+    [SerializeField] private SceneField _mainMenuScene;
 
     private List<Button> _unitButtons = new List<Button>();
     private List<Button> _clearTeamButtons = new List<Button>();
@@ -82,6 +85,7 @@ public class GameUIManager : MonoBehaviour
             GameStateManager.Instance.OnStateChanged += OnStateChanged;
             GameStateManager.Instance.OnUnitSelected += OnUnitSelected;
             GameStateManager.Instance.OnTeamWon += OnTeamWon;
+            GameStateManager.Instance.OnPauseChanged += OnPauseChanged; // ADDED: Subscribe to pause changes
 
             CreateUnitButtons();
             CreateClearTeamButtons();
@@ -109,6 +113,7 @@ public class GameUIManager : MonoBehaviour
             GameStateManager.Instance.OnStateChanged -= OnStateChanged;
             GameStateManager.Instance.OnUnitSelected -= OnUnitSelected;
             GameStateManager.Instance.OnTeamWon -= OnTeamWon;
+            GameStateManager.Instance.OnPauseChanged -= OnPauseChanged; // ADDED: Unsubscribe
         }
     }
 
@@ -207,6 +212,10 @@ public class GameUIManager : MonoBehaviour
         if (BackToPrepButton != null)
             BackToPrepButton.onClick.AddListener(() => GameStateManager.Instance.ReturnToPrep());
 
+        // ADDED: Pause/Resume button
+        if (PauseResumeButton != null)
+            PauseResumeButton.onClick.AddListener(OnPauseResumeClicked);
+
         // Pause Menu buttons
         if (ContinueButton != null)
             ContinueButton.onClick.AddListener(OnContinueClicked);
@@ -226,7 +235,22 @@ public class GameUIManager : MonoBehaviour
 
         // Team management buttons
         if (ClearAllButton != null)
+        {
+            // Right-click to debug teams
+            var eventTrigger = ClearAllButton.gameObject.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+            var pointerClick = new UnityEngine.EventSystems.EventTrigger.Entry();
+            pointerClick.eventID = UnityEngine.EventSystems.EventTriggerType.PointerClick;
+            pointerClick.callback.AddListener((data) => {
+                var pointerData = (UnityEngine.EventSystems.PointerEventData)data;
+                if (pointerData.button == UnityEngine.EventSystems.PointerEventData.InputButton.Right)
+                {
+                    DebugTeamContents();
+                }
+            });
+            eventTrigger.triggers.Add(pointerClick);
+            
             ClearAllButton.onClick.AddListener(OnClearAllClicked);
+        }
 
         // Save/load buttons
         if (SaveLayoutButton != null)
@@ -253,6 +277,12 @@ public class GameUIManager : MonoBehaviour
         if (PrepUI != null) PrepUI.SetActive(newState == GameState.Prep);
         if (SimulateUI != null) SimulateUI.SetActive(newState == GameState.Simulate);
         if (WinUI != null) WinUI.SetActive(newState == GameState.Win);
+
+        // Update pause button text when entering simulate state
+        if (newState == GameState.Simulate && GameStateManager.Instance != null)
+        {
+            UpdatePauseButtonText(GameStateManager.Instance.IsPaused);
+        }
 
         // Close all panels when changing states
         if (LoadLayoutPanel != null) LoadLayoutPanel.SetActive(false);
@@ -329,6 +359,34 @@ public class GameUIManager : MonoBehaviour
                 }
             }
         }
+    }
+
+    // ADDED: Handler for pause state changes
+    private void OnPauseChanged(bool isPaused)
+    {
+        UpdatePauseButtonText(isPaused);
+        
+        // Update optional status text
+        if (SimulateStatusText != null)
+        {
+            SimulateStatusText.text = isPaused ? "PAUSED" : "";
+        }
+    }
+
+    // ADDED: Update pause button text
+    private void UpdatePauseButtonText(bool isPaused)
+    {
+        if (PauseResumeButtonText != null)
+        {
+            PauseResumeButtonText.text = isPaused ? "Resume" : "Pause";
+        }
+    }
+
+    // ADDED: Pause/Resume button handler
+    private void OnPauseResumeClicked()
+    {
+        Debug.Log("[GameUIManager] Pause/Resume button clicked");
+        GameStateManager.Instance?.TogglePause();
     }
 
     // PAUSE MENU HANDLERS
@@ -414,7 +472,7 @@ public class GameUIManager : MonoBehaviour
         }
         
         // Load main menu scene
-        SceneManager.LoadScene(_mainMenuSceneName);
+        SceneManager.LoadScene(_mainMenuScene.Name);
     }
 
     private void OnQuitClicked()
@@ -681,5 +739,62 @@ public class GameUIManager : MonoBehaviour
                 OnClearAllClicked();
             }
         }
+    }
+
+    private void DebugTeamContents()
+    {
+        Debug.Log("========== TEAM DEBUG ==========");
+
+        if (TeamManager.Instance == null)
+        {
+            Debug.LogError("TeamManager is null");
+            return;
+        }
+
+        for (int i = 0; i < TeamManager.Instance.Teams.Count; i++)
+        {
+            Team team = TeamManager.Instance.Teams[i];
+            if (team == null)
+            {
+                Debug.LogWarning($"Team {i} is null");
+                continue;
+            }
+
+            Debug.Log($"Team {i}: {team.TotalUnits()} total units");
+
+            if (team.Units != null)
+            {
+                foreach (var kvp in team.Units)
+                {
+                    Debug.Log($"  {kvp.Key}: {kvp.Value?.Count ?? 0} units");
+                    if (kvp.Value != null)
+                    {
+                        foreach (ITroop troop in kvp.Value)
+                        {
+                            string name = troop?.GameObject?.name ?? "NULL";
+                            int teamIdx = troop?.TeamIndex ?? -1;
+                            Debug.Log($"    - {name} (TeamIndex: {teamIdx})");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogError($"Team {i}.Units dictionary is null!");
+            }
+        }
+
+        Debug.Log("========== ACTIVE TROOPS ==========");
+        if (GameStateManager.Instance != null)
+        {
+            foreach (ITroop troop in GameStateManager.Instance.ActiveTroops)
+            {
+                string name = troop?.GameObject?.name ?? "NULL";
+                int teamIdx = troop?.TeamIndex ?? -1;
+                Debug.Log($"  - {name} (TeamIndex: {teamIdx})");
+            }
+        }
+
+        Debug.Log("================================");
     }
 }

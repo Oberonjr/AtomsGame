@@ -14,6 +14,7 @@ public class UnitTeamIndicator : MonoBehaviour
     private SpriteRenderer _spriteRenderer;
     private ITroop _troop;
     private bool _isInitialized = false;
+    private Texture2D _generatedTexture; // Store reference
 
     void Awake()
     {
@@ -32,21 +33,18 @@ public class UnitTeamIndicator : MonoBehaviour
 
     void Start()
     {
-        // Try to get ITroop from parent
-        _troop = GetComponentInParent<ITroop>() as ITroop;
-
+        _troop = GetComponentInParent<ITroop>();
+        
         if (_troop == null)
         {
             Debug.LogError($"[UnitTeamIndicator] No ITroop found on {name}!");
+            enabled = false; // Disable the component
             return;
         }
 
-        // Subscribe to game state changes
         if (GameStateManager.Instance != null)
         {
             GameStateManager.Instance.OnStateChanged += OnGameStateChanged;
-
-            // Set initial state
             OnGameStateChanged(GameStateManager.Instance.CurrentState);
         }
 
@@ -59,6 +57,12 @@ public class UnitTeamIndicator : MonoBehaviour
         if (GameStateManager.Instance != null)
         {
             GameStateManager.Instance.OnStateChanged -= OnGameStateChanged;
+        }
+        
+        // Clean up generated texture
+        if (_generatedTexture != null)
+        {
+            Destroy(_generatedTexture);
         }
     }
 
@@ -112,7 +116,7 @@ public class UnitTeamIndicator : MonoBehaviour
     private Sprite CreateCircleSprite()
     {
         int resolution = 128;
-        Texture2D texture = new Texture2D(resolution, resolution);
+        _generatedTexture = new Texture2D(resolution, resolution);
         Color[] colors = new Color[resolution * resolution];
 
         Vector2 center = new Vector2(resolution / 2f, resolution / 2f);
@@ -137,12 +141,12 @@ public class UnitTeamIndicator : MonoBehaviour
             }
         }
 
-        texture.SetPixels(colors);
-        texture.Apply();
-        texture.filterMode = FilterMode.Bilinear;
+        _generatedTexture.SetPixels(colors);
+        _generatedTexture.Apply();
+        _generatedTexture.filterMode = FilterMode.Bilinear;
 
         return Sprite.Create(
-            texture,
+            _generatedTexture,
             new Rect(0, 0, resolution, resolution),
             new Vector2(0.5f, 0.5f),
             resolution / (2f * _radius) // Pixels per unit

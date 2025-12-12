@@ -32,6 +32,7 @@ public class GameStateManager : MonoBehaviour
     public event Action<UnitSelectionData> OnUnitSelected;
     public event Action<Team> OnTeamWon;
     public event Action OnLayoutCleared;
+    public event Action<bool> OnPauseChanged; // ADDED: Pause state changed event
 
     void Awake()
     {
@@ -200,6 +201,7 @@ public class GameStateManager : MonoBehaviour
             _saveLoadManager.RestorePrepState(_activeTroops, AvailableUnits, _unitSpawner);
             _isPaused = false;
             Time.timeScale = 1f;
+            OnPauseChanged?.Invoke(_isPaused); // ADDED: Notify pause state change
         }
         else if (_currentState == GameState.Win)
         {
@@ -207,6 +209,7 @@ public class GameStateManager : MonoBehaviour
             ClearAllTroops();
             _isPaused = false;
             Time.timeScale = 1f;
+            OnPauseChanged?.Invoke(_isPaused); // ADDED: Notify pause state change
         }
 
         _inputHandler.Enable();
@@ -228,6 +231,7 @@ public class GameStateManager : MonoBehaviour
         
         _isPaused = false;
         Time.timeScale = 1f;
+        OnPauseChanged?.Invoke(_isPaused); // ADDED: Notify pause state change
         
         _inputHandler.Enable();
         ChangeState(GameState.Prep);
@@ -328,6 +332,8 @@ public class GameStateManager : MonoBehaviour
         _isPaused = !_isPaused;
         Time.timeScale = _isPaused ? 0f : 1f;
         
+        OnPauseChanged?.Invoke(_isPaused); // ADDED: Notify pause state change
+        
         Debug.Log($"[GameStateManager] Game {(_isPaused ? "paused" : "resumed")}");
     }
 
@@ -341,21 +347,42 @@ public class GameStateManager : MonoBehaviour
     {
         if (_currentState != GameState.Prep) return;
 
-        List<ITroop> troopsToRemove = new List<ITroop>();
-        foreach (ITroop troop in _activeTroops)
+        Debug.Log($"[GameStateManager] === Clearing team {teamIndex} ===");
+
+        // Get the team
+        ITeam team = FindTeamByIndex(teamIndex);
+        if (team == null)
         {
-            Troop troopMono = troop as Troop;
-            if (troopMono != null && troopMono.TeamIndex == teamIndex)
+            Debug.LogError($"[GameStateManager] Team {teamIndex} not found!");
+            return;
+        }
+
+        Debug.Log($"[GameStateManager] Team {teamIndex} has {team.TotalUnits()} units registered");
+
+        // Get all troops from the team
+        List<ITroop> troopsToRemove = new List<ITroop>();
+        foreach (ITroop troop in team.GetAllUnits())
+        {
+            if (troop != null && troop.GameObject != null)
             {
                 troopsToRemove.Add(troop);
+                Debug.Log($"[GameStateManager] Marked {troop.GameObject.name} for removal");
             }
         }
 
+        Debug.Log($"[GameStateManager] Found {troopsToRemove.Count} troops to remove");
+
+        // Remove all troops
         foreach (ITroop troop in troopsToRemove)
         {
-            ITeam team = FindTeamByIndex(teamIndex);
-            _unitSpawner.RemoveTroop(troop, team);
+            if (troop != null && troop.GameObject != null)
+            {
+                Debug.Log($"[GameStateManager] Removing {troop.GameObject.name}");
+                _unitSpawner.RemoveTroop(troop, team);
+            }
         }
+
+        Debug.Log($"[GameStateManager] Team {teamIndex} cleared. Remaining: {team.TotalUnits()} units");
 
         OnLayoutCleared?.Invoke();
     }

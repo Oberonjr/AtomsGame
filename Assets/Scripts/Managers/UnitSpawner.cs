@@ -18,72 +18,48 @@ public class UnitSpawner : MonoBehaviour
     /// </summary>
     public ITroop SpawnTroop(UnitSelectionData unitData, Vector3 position, TeamArea teamArea, ITeam team)
     {
-        // Determine which prefab to use based on SimulationConfig
-        SimulationMode mode = SimulationMode.Unity; // Default
-        if (SimulationConfig.Instance != null)
+        if (unitData == null || team == null)
         {
-            mode = SimulationConfig.Instance.Mode;
-        }
-        
-        GameObject prefabToSpawn = null;
-        
-        if (mode == SimulationMode.Atoms && unitData.TroopPrefab_Atoms != null)
-        {
-            prefabToSpawn = unitData.TroopPrefab_Atoms.gameObject;
-        }
-        else if (unitData.TroopPrefab != null)
-        {
-            prefabToSpawn = unitData.TroopPrefab.gameObject;
-        }
-        
-        if (prefabToSpawn == null)
-        {
-            Debug.LogError($"[UnitSpawner] No prefab assigned for {unitData.DisplayName} in {mode} mode");
+            Debug.LogError("[UnitSpawner] Cannot spawn - null data or team");
             return null;
         }
-        
-        Quaternion spawnRotation = GetSpawnRotation(teamArea);
-        GameObject troopObj = Instantiate(prefabToSpawn, position, spawnRotation);
-        
-        if (troopObj == null)
+
+        // Determine which prefab to use based on mode
+        bool useAtoms = SimulationConfig.Instance != null && 
+                        SimulationConfig.Instance.Mode == SimulationMode.Atoms;
+
+        GameObject prefab = useAtoms ? unitData.TroopPrefab_Atoms?.gameObject : unitData.TroopPrefab?.gameObject;
+
+        if (prefab == null)
         {
-            Debug.LogError("[UnitSpawner] Failed to instantiate prefab");
+            Debug.LogError($"[UnitSpawner] No prefab available for {unitData.DisplayName} in {(useAtoms ? "Atoms" : "Unity")} mode");
             return null;
         }
-        
-        // Position correction
-        Vector3 finalPos = troopObj.transform.position;
-        finalPos.z = 0f;
-        troopObj.transform.position = finalPos;
-        troopObj.transform.rotation = spawnRotation;
-        
+
+        GameObject troopObj = Instantiate(prefab, position, Quaternion.identity);
         ITroop troop = troopObj.GetComponent<ITroop>() as ITroop;
-        
+
         if (troop != null)
         {
-            // Set team index based on type
-            if (troop is Troop unityTroop)
-            {
-                unityTroop.TeamIndex = team.TeamIndex;
-                Debug.Log($"[UnitSpawner] Spawned Unity {unitData.DisplayName} for team {team.TeamIndex}");
-            }
-            else if (troop is Troop_Atoms atomsTroop)
-            {
-                atomsTroop.TeamIndex = team.TeamIndex;
-                Debug.Log($"[UnitSpawner] Spawned Atoms {unitData.DisplayName} for team {team.TeamIndex}");
-            }
+            // IMPORTANT: Set team index BEFORE registering
+            troop.TeamIndex = team.TeamIndex;
             
+            Debug.Log($"[UnitSpawner] Spawned {unitData.DisplayName} for team {team.TeamIndex} at {position}");
+
+            // Register with team
             team.RegisterUnit(troop);
-            OnTroopSpawned?.Invoke(troop);
             
-            return troop;
+            Debug.Log($"[UnitSpawner] Team {team.TeamIndex} now has {team.TotalUnits()} units");
+
+            OnTroopSpawned?.Invoke(troop);
         }
         else
         {
-            Debug.LogError($"[UnitSpawner] Spawned prefab has no ITroop component!");
+            Debug.LogError($"[UnitSpawner] Spawned object has no ITroop component: {troopObj.name}");
             Destroy(troopObj);
-            return null;
         }
+
+        return null;
     }
 
     /// <summary>
@@ -97,25 +73,26 @@ public class UnitSpawner : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[UnitSpawner] Removing troop");
+        string troopName = troop.GameObject != null ? troop.GameObject.name : "Unknown";
+        int teamIndex = team != null ? team.TeamIndex : -1;
 
-        // Notify team (null check)
+        Debug.Log($"[UnitSpawner] Removing {troopName} from team {teamIndex}");
+
+        // Unregister from team
         if (team != null)
         {
             team.OnUnitDied(troop);
-        }
-        else
-        {
-            Debug.LogWarning("[UnitSpawner] Team is null when removing troop");
+            Debug.Log($"[UnitSpawner] Team {teamIndex} now has {team.TotalUnits()} units");
         }
 
         // Notify listeners
         OnTroopRemoved?.Invoke(troop);
 
-        // Destroy GameObject (null check)
+        // Destroy GameObject
         if (troop.GameObject != null)
         {
             Destroy(troop.GameObject);
+            Debug.Log($"[UnitSpawner] Destroyed {troopName}");
         }
     }
 
