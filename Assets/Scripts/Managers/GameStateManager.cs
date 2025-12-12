@@ -66,6 +66,12 @@ public class GameStateManager : MonoBehaviour
         _inputHandler.OnRemoveUnitRequested += OnRemoveUnitRequested;
         
         _inputHandler.Enable();
+
+        // Initialize profiler
+        if (PerformanceProfiler.Instance != null && SimulationConfig.Instance != null)
+        {
+            PerformanceProfiler.Instance.StartProfiling(SimulationConfig.Instance.Mode);
+        }
     }
 
     void OnDestroy()
@@ -110,14 +116,20 @@ public class GameStateManager : MonoBehaviour
 
         _saveLoadManager.SavePrepState(_activeTroops);
 
-        // Determine mode - DEFAULT TO UNITY
-        SimulationMode mode = SimulationMode.Unity; // Default
+        // Determine mode
+        SimulationMode mode = SimulationMode.Unity;
         if (SimulationConfig.Instance != null)
         {
             mode = SimulationConfig.Instance.Mode;
         }
         
         Debug.Log($"[GameStateManager] Starting simulation in {mode} mode");
+        
+        // Start profiling
+        if (PerformanceProfiler.Instance != null)
+        {
+            PerformanceProfiler.Instance.StartProfiling(mode);
+        }
         
         if (mode == SimulationMode.Atoms)
         {

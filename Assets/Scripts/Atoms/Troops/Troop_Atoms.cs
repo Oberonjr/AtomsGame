@@ -33,6 +33,7 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     private Animator _animator;
     private TroopFSM_Atoms _fsm;
     protected TroopAnimationController _animController;
+    private float _lastAttackTime = float.MinValue;
     private Troop_Atoms _target;
     
     // Cached stats for performance
@@ -343,15 +344,12 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     private void OnStatsChanged(TroopStats_Atoms newStats)
     {
         _cachedStats = newStats;
-        
-        // Update agent speed using converter
         _agent.speed = AtomsVariableConverter.ToFloat(newStats.MoveSpeed, 3.5f);
         
-        Debug.Log($"[Troop_Atoms] Stats changed - new speed: {_agent.speed}");
-        
-        // Optional: Debug all stats
+        // Only log if verbose
         if (SimulationConfig.Instance?.VerboseLogging ?? false)
         {
+            Debug.Log($"[Troop_Atoms] {name} stats changed - new speed: {_agent.speed}");
             AtomsVariableConverter.DebugLogAtomsStats(newStats, $"[{name}] ");
         }
     }
@@ -424,6 +422,10 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         yield return null;
         if (gameObject != null)
         {
+            if (PerformanceProfiler.Instance != null)
+            {
+                PerformanceProfiler.Instance.RecordUnitDeath();
+            }
             Destroy(gameObject);
         }
     }
@@ -461,13 +463,33 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     
     public virtual void Attack()
     {
-        if (Target == null || Target.IsDead) return;
-        
+        if (Target == null || (Target.IsDead) || Target.gameObject == null)
+        {
+            Debug.LogWarning($"[Troop_Atoms] {name} tried to attack invalid target");
+            return;
+        }
+
         _animController?.PlayAttackAnimation();
         int _cachedDamage = AtomsVariableConverter.ToInt(_cachedStats.Damage);
         Target.TakeDamage(_cachedDamage);
+
+        // ADDED: Record attack for performance profiling
+        if (PerformanceProfiler.Instance != null)
+        {
+            PerformanceProfiler.Instance.RecordAttack();
+            PerformanceProfiler.Instance.RecordDamage(_cachedDamage);
+        }
+
+        // ADDED: Track last attack time
+        _lastAttackTime = Time.time;
     }
-    
+
+    // ADDED: Public accessor for last attack time (used by FSM)
+    public float GetLastAttackTime()
+    {
+        return _lastAttackTime;
+    }
+
     // ========== Helper Methods for FSM and Subclasses ==========
     public float GetAttackRange() => AtomsVariableConverter.ToFloat(_cachedStats.AttackRange, 2f);
     public float GetInitialAttackDelay() => AtomsVariableConverter.ToFloat(_cachedStats.InitialAttackDelay, 0.3f);

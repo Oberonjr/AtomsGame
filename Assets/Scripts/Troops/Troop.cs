@@ -10,12 +10,13 @@ public class Troop : MonoBehaviour, ITroop, IEquatable<Troop>
     [HideInInspector] public Troop Target;
     [HideInInspector] public int TeamIndex;
     [HideInInspector] public bool IsDead = false;
-    [HideInInspector] public bool IsAIActive = false; // NEW: Controls AI behavior
+    [HideInInspector] public bool IsAIActive = false;
 
     private NavMeshAgent _agent;
     private Animator _animator = null;
     private TroopFSM _fsm;
     protected TroopAnimationController _animController;
+    private float _lastAttackTime = float.MinValue; // ADDED: Initialize to very small value
 
     public NavMeshAgent Agent => _agent;
     public Animator Animator => _animator;
@@ -391,13 +392,15 @@ public class Troop : MonoBehaviour, ITroop, IEquatable<Troop>
 
     private System.Collections.IEnumerator DestroyAfterDelay()
     {
-        yield return null; // Wait one frame
-        Debug.Log($"[Troop] {name} destroying GameObject now");
+        yield return new WaitForSeconds(0.5f);
         
-        if (gameObject != null)
+        // Record death
+        if (PerformanceProfiler.Instance != null)
         {
-            Destroy(gameObject);
+            PerformanceProfiler.Instance.RecordUnitDeath();
         }
+        
+        Destroy(gameObject);
     }
 
     public virtual void Attack()
@@ -414,7 +417,30 @@ public class Troop : MonoBehaviour, ITroop, IEquatable<Troop>
             _animController.PlayAttackAnimation();
         }
 
-        Target.TakeDamage(TroopStats.Damage);
+        int damage = TroopStats.Damage;
+        Target.TakeDamage(damage);
+        
+        // Record attack
+        if (PerformanceProfiler.Instance != null)
+        {
+            PerformanceProfiler.Instance.RecordAttack();
+            PerformanceProfiler.Instance.RecordDamage(damage);
+        }
+        
+        // FIXED: Only update _lastAttackTime once
+        _lastAttackTime = Time.time;
+    }
+
+    // ADDED: Public accessor for last attack time (used by FSM)
+    public float GetLastAttackTime()
+    {
+        return _lastAttackTime;
+    }
+
+    // ADDED: Check if cooldown has elapsed
+    public bool CanAttack()
+    {
+        return Time.time - _lastAttackTime >= TroopStats.AttackCooldown;
     }
 
     public bool Equals(Troop other)

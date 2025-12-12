@@ -36,14 +36,10 @@ public class UnitSpawner : MonoBehaviour
             return null;
         }
 
-        GameObject troopObj = Instantiate(prefab, position, Quaternion.identity);
-        ITroop troop = troopObj.GetComponent<ITroop>() as ITroop;
+        ITroop troop = SpawnTroopInstance(prefab, position, team.TeamIndex);
 
         if (troop != null)
         {
-            // IMPORTANT: Set team index BEFORE registering
-            troop.TeamIndex = team.TeamIndex;
-            
             Debug.Log($"[UnitSpawner] Spawned {unitData.DisplayName} for team {team.TeamIndex} at {position}");
 
             // Register with team
@@ -55,8 +51,7 @@ public class UnitSpawner : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"[UnitSpawner] Spawned object has no ITroop component: {troopObj.name}");
-            Destroy(troopObj);
+            Debug.LogError($"[UnitSpawner] Spawned object has no ITroop component: {prefab.name}");
         }
 
         return null;
@@ -96,6 +91,26 @@ public class UnitSpawner : MonoBehaviour
         }
     }
 
+    private ITroop SpawnTroopInstance(GameObject prefab, Vector3 position, int teamIndex)
+    {
+        GameObject troopObj = Instantiate(prefab, position, Quaternion.identity);
+        troopObj.name = $"{prefab.name}_{teamIndex}";
+
+        ITroop troop = troopObj.GetComponent<ITroop>();
+        if (troop != null)
+        {
+            troop.TeamIndex = teamIndex;
+            
+            // ADDED: Record spawn
+            if (PerformanceProfiler.Instance != null)
+            {
+                PerformanceProfiler.Instance.RecordUnitSpawned();
+            }
+        }
+
+        return troop;
+    }
+
     private Quaternion GetSpawnRotation(TeamArea spawnArea)
     {
         if (TeamManager.Instance == null || spawnArea == null)
@@ -125,4 +140,5 @@ public class UnitSpawner : MonoBehaviour
 
         return Quaternion.identity;
     }
+
 }
