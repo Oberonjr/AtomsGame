@@ -7,8 +7,7 @@ using UnityAtoms.BaseAtoms;
 /// <summary>
 /// Pure Atoms troop implementation with per-instance variables using Instancers
 /// </summary>
-[RequireComponent(typeof(NavMeshAgent))
-]
+[RequireComponent(typeof(NavMeshAgent))]
 public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
 {
     [Header("Atoms Stats Configuration")]
@@ -33,7 +32,7 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     private Animator _animator;
     private TroopFSM_Atoms _fsm;
     protected TroopAnimationController _animController;
-    private float _lastAttackTime = float.MinValue;
+    protected float _lastAttackTime = float.MinValue;
     private Troop_Atoms _target;
     
     // Cached stats for performance
@@ -47,18 +46,18 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     {
         get
         {
-            // If instancer exists and has a variable, use it
+            // ADDED: Track variable read
+            AtomsPerformanceTracker.TrackVariableRead();
+            
             if (_statsInstancer != null && _statsInstancer.Variable != null)
             {
                 return _statsInstancer.Variable.Value;
             }
             
-            // Fallback to cached stats
             if (_cachedStats.Equals(default(TroopStats_Atoms)))
             {
-                // Not initialized yet - return a safe default
                 Debug.LogWarning($"[Troop_Atoms] {name} Stats accessed before initialization");
-                return new TroopStats_Atoms(); // Return empty struct
+                return new TroopStats_Atoms();
             }
             
             return _cachedStats;
@@ -68,20 +67,50 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     // Reactive properties using Instancers
     public int CurrentHealth
     {
-        get => _healthInstancer?.Variable.Value ?? 0;
-        set => _healthInstancer?.Variable.SetValue(value);
+        get
+        {
+            // ADDED: Track variable read
+            AtomsPerformanceTracker.TrackVariableRead();
+            return _healthInstancer?.Variable.Value ?? 0;
+        }
+        set
+        {
+            // ADDED: Track variable write
+            AtomsPerformanceTracker.TrackVariableWrite();
+            _healthInstancer?.Variable.SetValue(value);
+        }
     }
     
     public bool IsDead
     {
-        get => _isDeadInstancer?.Variable.Value ?? false;
-        private set => _isDeadInstancer?.Variable.SetValue(value);
+        get
+        {
+            // ADDED: Track variable read
+            AtomsPerformanceTracker.TrackVariableRead();
+            return _isDeadInstancer?.Variable.Value ?? false;
+        }
+        private set
+        {
+            // ADDED: Track variable write
+            AtomsPerformanceTracker.TrackVariableWrite();
+            _isDeadInstancer?.Variable.SetValue(value);
+        }
     }
     
     public bool IsAIActive
     {
-        get => _isAIActiveInstancer?.Variable.Value ?? false;
-        set => _isAIActiveInstancer?.Variable.SetValue(value);
+        get
+        {
+            // ADDED: Track variable read
+            AtomsPerformanceTracker.TrackVariableRead();
+            return _isAIActiveInstancer?.Variable.Value ?? false;
+        }
+        set
+        {
+            // ADDED: Track variable write
+            AtomsPerformanceTracker.TrackVariableWrite();
+            _isAIActiveInstancer?.Variable.SetValue(value);
+        }
     }
     
     public Troop_Atoms Target
@@ -94,9 +123,17 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
             bool hasTarget = _target != null;
             
             if (!hadTarget && hasTarget)
+            {
+                // ADDED: Track event dispatch
+                AtomsPerformanceTracker.TrackEventDispatch();
                 _onTargetAcquired?.Raise();
+            }
             else if (hadTarget && !hasTarget)
+            {
+                // ADDED: Track event dispatch
+                AtomsPerformanceTracker.TrackEventDispatch();
                 _onTargetLost?.Raise();
+            }
         }
     }
     
@@ -105,7 +142,6 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     {
         get
         {
-            // Safe access - return null if destroyed
             if (this == null) return null;
             try
             {
@@ -122,7 +158,6 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     {
         get
         {
-            // Safe access - return null if destroyed
             if (this == null) return null;
             try
             {
@@ -135,16 +170,14 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         }
     }
     
-    int ITroop.TeamIndex // CHANGED: Property
+    int ITroop.TeamIndex
     {
         get => TeamIndex;
         set => TeamIndex = value;
     }
     
-    // Deprecated - return null for Atoms
     TroopStats ITroop.TroopStats => null;
 
-    // NEW: Direct stat access using converter
     int ITroop.GetMaxHealth() => AtomsVariableConverter.ToInt(_cachedStats.MaxHealth, 100);
     int ITroop.GetDamage() => AtomsVariableConverter.ToInt(_cachedStats.Damage, 10);
     float ITroop.GetAttackRange() => AtomsVariableConverter.ToFloat(_cachedStats.AttackRange, 2f);
@@ -170,12 +203,13 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         // Cache stats - WITH NULL CHECK
         if (_statsInstancer != null && _statsInstancer.Variable != null)
         {
+            // ADDED: Track variable read
+            AtomsPerformanceTracker.TrackVariableRead();
             _cachedStats = _statsInstancer.Variable.Value;
         }
         else
         {
             Debug.LogWarning($"[Troop_Atoms] {name} has no stats instancer! Using default values.");
-            // Initialize with defaults if no instancer
             _cachedStats = new TroopStats_Atoms();
         }
         
@@ -194,6 +228,8 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         // Subscribe to Atoms Variable changes - WITH NULL CHECKS
         if (_healthInstancer != null && _healthInstancer.Variable != null)
         {
+            // ADDED: Track allocation for listener registration
+            AtomsPerformanceTracker.TrackAllocation(64); // Approximate listener size
             _healthInstancer.Variable.Changed.Register(OnHealthChanged);
         }
         else
@@ -203,6 +239,7 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         
         if (_isDeadInstancer != null && _isDeadInstancer.Variable != null)
         {
+            AtomsPerformanceTracker.TrackAllocation(64);
             _isDeadInstancer.Variable.Changed.Register(OnIsDeadChanged);
         }
         else
@@ -212,6 +249,7 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         
         if (_isAIActiveInstancer != null && _isAIActiveInstancer.Variable != null)
         {
+            AtomsPerformanceTracker.TrackAllocation(64);
             _isAIActiveInstancer.Variable.Changed.Register(OnIsAIActiveChanged);
         }
         else
@@ -221,6 +259,7 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         
         if (_statsInstancer != null && _statsInstancer.Variable != null)
         {
+            AtomsPerformanceTracker.TrackAllocation(64);
             _statsInstancer.Variable.Changed.Register(OnStatsChanged);
         }
     }
@@ -260,7 +299,6 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         
         _animController = GetComponent<TroopAnimationController>();
         
-        // NEW: Add team indicator
         AddTeamIndicator();
         
         OnStart();
@@ -268,17 +306,14 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
 
     private void AddTeamIndicator()
     {
-        // Check if already has indicator
         if (GetComponentInChildren<UnitTeamIndicator>() != null)
             return;
 
-        // Create indicator GameObject
         GameObject indicator = new GameObject("TeamIndicator");
         indicator.transform.SetParent(transform);
         indicator.transform.localPosition = Vector3.zero;
         indicator.transform.localRotation = Quaternion.identity;
         
-        // Add components
         indicator.AddComponent<SpriteRenderer>();
         indicator.AddComponent<UnitTeamIndicator>();
     }
@@ -291,7 +326,6 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
             _fsm.Update();
         }
         
-        // ADD THIS: Call virtual method for subclasses
         OnUpdate();
     }
     
@@ -328,30 +362,43 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     // ========== Atoms Event Handlers ==========
     private void OnHealthChanged(int newHealth)
     {
+        // ADDED: Track listener invocation
+        AtomsPerformanceTracker.BeginListenerInvoke();
         // React to health changes (e.g., update UI)
+        AtomsPerformanceTracker.EndListenerInvoke();
     }
     
     private void OnIsDeadChanged(bool isDead)
     {
+        // ADDED: Track listener invocation
+        AtomsPerformanceTracker.BeginListenerInvoke();
         // React to death state changes
+        AtomsPerformanceTracker.EndListenerInvoke();
     }
     
     private void OnIsAIActiveChanged(bool isActive)
     {
+        // ADDED: Track listener invocation
+        AtomsPerformanceTracker.BeginListenerInvoke();
         // React to AI state changes
+        AtomsPerformanceTracker.EndListenerInvoke();
     }
     
     private void OnStatsChanged(TroopStats_Atoms newStats)
     {
+        // ADDED: Track listener invocation
+        AtomsPerformanceTracker.BeginListenerInvoke();
+        
         _cachedStats = newStats;
         _agent.speed = AtomsVariableConverter.ToFloat(newStats.MoveSpeed, 3.5f);
         
-        // Only log if verbose
         if (SimulationConfig.Instance?.VerboseLogging ?? false)
         {
             Debug.Log($"[Troop_Atoms] {name} stats changed - new speed: {_agent.speed}");
             AtomsVariableConverter.DebugLogAtomsStats(newStats, $"[{name}] ");
         }
+        
+        AtomsPerformanceTracker.EndListenerInvoke();
     }
     
     // ========== Core Methods ==========
@@ -368,8 +415,14 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     {
         if (IsDead) return;
         
-        CurrentHealth -= damage;
-        _onDamageTaken?.Raise(damage);
+        CurrentHealth -= damage; // Triggers tracking via property setter
+        
+        // ADDED: Track event dispatch
+        if (_onDamageTaken != null)
+        {
+            AtomsPerformanceTracker.TrackEventDispatch();
+            _onDamageTaken.Raise(damage);
+        }
         
         _animController?.PlayHitAnimation();
         
@@ -383,12 +436,16 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     {
         if (gameObject == null) return;
         
-        IsDead = true;
-        IsAIActive = false;
+        IsDead = true; // Triggers tracking via property setter
+        IsAIActive = false; // Triggers tracking via property setter
         
-        _onDeath?.Raise();
+        // ADDED: Track event dispatch
+        if (_onDeath != null)
+        {
+            AtomsPerformanceTracker.TrackEventDispatch();
+            _onDeath.Raise();
+        }
         
-        // Disable components - NO NULL CONDITIONAL
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
         {
@@ -411,7 +468,6 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
             Agent.enabled = false;
         }
         
-        // Pass as ITroop - works universally
         GlobalEvents.RaiseUnitDied(this);
         
         StartCoroutine(DestroyAfterDelay());
@@ -437,7 +493,7 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
             target = null;
         }
         
-        Target = target;
+        Target = target; // Triggers event tracking via property setter
         
         if (!IsAIActive || _fsm == null) return;
         
@@ -463,7 +519,7 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
     
     public virtual void Attack()
     {
-        if (Target == null || (Target.IsDead) || Target.gameObject == null)
+        if (Target == null || Target.IsDead || Target.gameObject == null)
         {
             Debug.LogWarning($"[Troop_Atoms] {name} tried to attack invalid target");
             return;
@@ -473,18 +529,15 @@ public class Troop_Atoms : MonoBehaviour, ITroop, IEquatable<Troop_Atoms>
         int _cachedDamage = AtomsVariableConverter.ToInt(_cachedStats.Damage);
         Target.TakeDamage(_cachedDamage);
 
-        // ADDED: Record attack for performance profiling
         if (PerformanceProfiler.Instance != null)
         {
             PerformanceProfiler.Instance.RecordAttack();
             PerformanceProfiler.Instance.RecordDamage(_cachedDamage);
         }
 
-        // ADDED: Track last attack time
         _lastAttackTime = Time.time;
     }
 
-    // ADDED: Public accessor for last attack time (used by FSM)
     public float GetLastAttackTime()
     {
         return _lastAttackTime;

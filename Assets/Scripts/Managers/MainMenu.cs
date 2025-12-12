@@ -10,6 +10,7 @@ public class MainMenu : MonoBehaviour
     [SerializeField] private Button _unityModeButton;
     [SerializeField] private Button _atomsModeButton;
     [SerializeField] private Button _startButton;
+    [SerializeField] private Button _comparisonButton;
     [SerializeField] private Button _quitButton;
 
     [Header("UI Display")]
@@ -19,6 +20,7 @@ public class MainMenu : MonoBehaviour
 
     [Header("Settings")]
     [SerializeField] private SceneField _gameScene;
+    [SerializeField] private SceneField _comparisonScene;
 
     private SimulationMode _selectedMode = SimulationMode.Unity;
 
@@ -33,6 +35,9 @@ public class MainMenu : MonoBehaviour
 
         if (_startButton != null)
             _startButton.onClick.AddListener(StartGame);
+
+        if (_comparisonButton != null)
+            _comparisonButton.onClick.AddListener(StartComparison);
 
         if (_quitButton != null)
             _quitButton.onClick.AddListener(QuitGame);
@@ -127,6 +132,13 @@ public class MainMenu : MonoBehaviour
 
         // Load game scene
         SceneManager.LoadScene(_gameScene.Name);
+    }
+
+    private void StartComparison()
+    {
+        Debug.Log("[MainMenu] Starting performance comparison");
+        // Load comparison scene
+        SceneManager.LoadScene(_comparisonScene.Name);
     }
 
     private void QuitGame()

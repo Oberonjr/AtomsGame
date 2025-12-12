@@ -11,4 +11,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/EnemyLogicTesting.unity
     guid: cac82035e2a4e9c4082549781427656a
+  - enabled: 1
+    path: Assets/Scenes/ComparisonScene.unity
+    guid: dbe86b0605317074c96aa9c80a56bd88
   m_configObjects: {}
