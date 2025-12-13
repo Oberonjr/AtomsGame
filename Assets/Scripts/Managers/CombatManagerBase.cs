@@ -295,6 +295,12 @@ public abstract class CombatManagerBase : MonoBehaviour, ICombatManager
     {
         if (troop == null || troop.IsDead) return;
 
+        // ADDED: Track stuck event
+        if (PerformanceProfiler.Instance != null)
+        {
+            PerformanceProfiler.Instance.RecordNavMeshStuck();
+        }
+
         string oldTargetName = troop.Target?.GameObject?.name ?? "null";
 
         // Clear current target
@@ -341,7 +347,18 @@ public abstract class CombatManagerBase : MonoBehaviour, ICombatManager
 
         if (agent != null && agent.enabled && agent.isOnNavMesh)
         {
-            // Reset path to clear any stuck state
+            // ADDED: Track NavMesh operations
+            if (PerformanceProfiler.Instance != null)
+            {
+                PerformanceProfiler.Instance.RecordNavMeshRecalculation();
+                
+                if (agent.hasPath)
+                {
+                    float pathLength = agent.path.GetCornersNonAlloc(new Vector3[agent.path.corners.Length]);
+                    PerformanceProfiler.Instance.RecordNavMeshPathLength(pathLength);
+                }
+            }
+            
             agent.ResetPath();
             agent.velocity = Vector3.zero;
             agent.isStopped = false;

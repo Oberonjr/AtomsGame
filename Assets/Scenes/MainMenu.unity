@@ -132,6 +132,7 @@ GameObject:
   m_Component:
   - component: {fileID: 283846107}
   - component: {fileID: 283846106}
+  - component: {fileID: 283846108}
   m_Layer: 0
   m_Name: Profiler
   m_TagString: Untagged
@@ -155,8 +156,8 @@ MonoBehaviour:
   _sampleInterval: 0.1
   _autoExportOnEnd: 1
   _exportPath: PerformanceData
-  _showOnScreenStats: 1
   _toggleStatsKey: 282
+  _trackWarmupPhase: 1
 --- !u!4 &283846107
 Transform:
   m_ObjectHideFlags: 0
@@ -172,6 +173,23 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &283846108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 283846105}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8cf0eb02ab69948448f932fabd8957da, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameScene:
+    _sceneOB: {fileID: 102900000, guid: cac82035e2a4e9c4082549781427656a, type: 3}
+    _name: EnemyLogicTesting
+    _path: Assets/Scenes/EnemyLogicTesting.unity
+    _buildIndex: 1
 --- !u!1 &286924181
 GameObject:
   m_ObjectHideFlags: 0

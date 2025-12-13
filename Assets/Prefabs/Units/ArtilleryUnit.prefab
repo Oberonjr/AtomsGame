@@ -107,18 +107,22 @@ MonoBehaviour:
   TroopStats: {fileID: 11400000, guid: c56bd25bfedf8e04eb90b4e7435733bc, type: 2}
   CurrentHealth: 0
   Target: {fileID: 0}
+  TeamIndex: 0
+  IsDead: 0
+  IsAIActive: 0
   RocketPrefab: {fileID: 8203588250588530597, guid: c103084ff32ea4a4a92582adc8a644fd, type: 3}
   LaunchPoint: {fileID: 2845608305086684339}
   RocketInitialStraightTime: 0.5
   RocketInitialSpeed: 5
-  RocketMaxSpeed: 20
-  RocketAcceleration: 5
+  RocketMaxSpeed: 30
+  RocketAcceleration: 7.5
   RocketInitialTurnSpeed: 50
-  RocketMaxTurnSpeed: 200
-  RocketTurnAcceleration: 50
-  RocketExplosionRadius: 3
-  RocketLifespan: 10
+  RocketMaxTurnSpeed: 300
+  RocketTurnAcceleration: 80
+  RocketExplosionRadius: 4.5
+  RocketLifespan: 6
   RocketExplosionEffectPrefab: {fileID: 1179456181368179998, guid: e8498d9cb40d8ef479ecbf0eacd2850f, type: 3}
+  VFXDesignRadius: 0.1
 --- !u!114 &-7070349873838376605
 MonoBehaviour:
   m_ObjectHideFlags: 0

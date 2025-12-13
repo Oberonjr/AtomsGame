@@ -40,16 +40,35 @@ public class CombatManager_Atoms : CombatManagerBase
 
     protected override void OnInitialize()
     {
-        _onCombatStart?.Raise();
+        // ADDED: Track event dispatch
+        if (_onCombatStart != null)
+        {
+            AtomsPerformanceTracker.TrackEventDispatch();
+            _onCombatStart.Raise();
+        }
     }
     
     protected override void OnCleanup()
     {
-        _onCombatEnd?.Raise();
+        // ADDED: Track event dispatch
+        if (_onCombatEnd != null)
+        {
+            AtomsPerformanceTracker.TrackEventDispatch();
+            _onCombatEnd.Raise();
+        }
     }
     
     protected override void OnTargetAssigned(ITroop troop, ITroop target)
     {
-        _onTargetAssigned?.Raise();
+        // ADDED: Track event dispatch with latency
+        var latencyToken = AtomsPerformanceTracker.StartEventLatencyTracking();
+        
+        if (_onTargetAssigned != null)
+        {
+            AtomsPerformanceTracker.TrackEventDispatch();
+            _onTargetAssigned.Raise();
+        }
+        
+        AtomsPerformanceTracker.EndEventLatencyTracking(latencyToken);
     }
 }

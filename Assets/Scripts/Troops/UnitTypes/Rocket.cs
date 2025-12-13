@@ -74,6 +74,12 @@ public class Rocket : MonoBehaviour
         _isHoming = false;
         _isDestroyed = false;
         _retargetTimer = 0f;
+        
+        // ? SECTION 11: Track projectile spawn
+        if (PerformanceProfiler.Instance != null)
+        {
+            PerformanceProfiler.Instance.RecordProjectileSpawned();
+        }
     }
 
     void Start()
@@ -121,14 +127,6 @@ public class Rocket : MonoBehaviour
                 _retargetTimer = 0f;
                 FindNewTarget();
             }
-
-            // REMOVED: Don't destroy if no target found
-            // Keep flying in current direction until lifespan expires or hits something
-            // if (!HasValidTarget())
-            // {
-            //     DestroySilently();
-            //     return;
-            // }
         }
 
         // Switch to homing after initial straight phase
@@ -226,6 +224,13 @@ public class Rocket : MonoBehaviour
         if (nearestEnemy != null)
         {
             _target = nearestEnemy;
+            
+            // ? SECTION 11: Track projectile retarget
+            if (PerformanceProfiler.Instance != null)
+            {
+                PerformanceProfiler.Instance.RecordProjectileRetarget();
+            }
+            
             Debug.Log($"[Rocket] Retargeted to {nearestEnemy.GameObject.name}");
         }
     }
@@ -249,6 +254,9 @@ public class Rocket : MonoBehaviour
     {
         Collider2D[] hits = Physics2D.OverlapCircleAll(center, _explosionRadius);
 
+        int unitsHit = 0;
+        int totalDamage = 0;
+
         foreach (Collider2D hit in hits)
         {
             ITroop troop = hit.GetComponentInParent<ITroop>() as ITroop;
@@ -256,6 +264,22 @@ public class Rocket : MonoBehaviour
             if (troop != null && troop.TeamIndex != _ownerTeamIndex && !troop.IsDead)
             {
                 troop.TakeDamage(_damage);
+                unitsHit++;
+                totalDamage += _damage;
+            }
+        }
+
+        // ? SECTION 11: Record splash damage statistics
+        if (PerformanceProfiler.Instance != null && unitsHit > 0)
+        {
+            PerformanceProfiler.Instance.RecordSplashDamage(unitsHit, totalDamage);
+            PerformanceProfiler.Instance.RecordAttack();
+            PerformanceProfiler.Instance.RecordDamage(totalDamage);
+            
+            // Log splash effectiveness
+            if (SimulationConfig.Instance?.VerboseLogging ?? false)
+            {
+                Debug.Log($"[Rocket] Splash hit {unitsHit} units for {totalDamage} total damage");
             }
         }
     }

@@ -11,6 +11,13 @@ public class TroopFSM_Atoms
 
     public void ChangeState(IState_Atoms newState)
     {
+        if (PerformanceProfiler.Instance != null && _currentState != null)
+        {
+            string fromState = _currentState.GetType().Name;
+            string toState = newState.GetType().Name;
+            PerformanceProfiler.Instance.RecordStateTransition(fromState, toState);
+        }
+
         if (_currentState != null)
         {
             _currentState.Exit();

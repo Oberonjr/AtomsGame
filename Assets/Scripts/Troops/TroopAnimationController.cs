@@ -123,37 +123,45 @@ public class TroopAnimationController : MonoBehaviour
 
     private void PlayMeleeAttack()
     {
-        string attackParam = _useThrust ? _attackThrustParameterName : _attackSlashParameterName;
+        string trigger = _useThrust ? _attackThrustParameterName : _attackSlashParameterName;
         
-        if (HasParameter(attackParam))
+        if (HasParameter(trigger))
         {
-            _animator.SetTrigger(attackParam);
+            // ? SECTION 14: Record animation trigger
+            if (PerformanceProfiler.Instance != null)
+            {
+                PerformanceProfiler.Instance.RecordAnimationTrigger($"Melee_{trigger}");
+            }
+            
+            _animator.SetTrigger(trigger);
             _useThrust = !_useThrust;
         }
         else
         {
-            Debug.LogError($"[AnimController] Missing trigger parameter: {attackParam}");
+            Debug.LogError($"[AnimController] Missing trigger parameter: {trigger}");
         }
     }
 
     private void PlayRangedAttack()
     {
-        if (_troop.Target == null) return;
-
-        // FIXED: Use ITroop.Transform property
-        Vector3 targetPosition = _troop.Target.Transform.position;
-        Vector3 troopPosition = _troop.Transform.position;
+        bool isClose = _troop.Target != null &&
+                       Vector3.Distance(_troop.Transform.position, _troop.Target.Transform.position) < _closeRangeDistance;
         
-        bool isClose = Vector3.Distance(troopPosition, targetPosition) < _closeRangeDistance;
-        string attackParam = isClose ? _hipFireParameterName : _aimedShotParameterName;
+        string trigger = isClose ? _hipFireParameterName : _aimedShotParameterName;
         
-        if (HasParameter(attackParam))
+        if (HasParameter(trigger))
         {
-            _animator.SetTrigger(attackParam);
+            // ? SECTION 14: Record animation trigger
+            if (PerformanceProfiler.Instance != null)
+            {
+                PerformanceProfiler.Instance.RecordAnimationTrigger($"Ranged_{trigger}");
+            }
+            
+            _animator.SetTrigger(trigger);
         }
         else
         {
-            Debug.LogError($"[AnimController] Missing trigger parameter: {attackParam}");
+            Debug.LogError($"[AnimController] Missing trigger parameter: {trigger}");
         }
     }
 
@@ -161,6 +169,12 @@ public class TroopAnimationController : MonoBehaviour
     {
         if (HasParameter(_aimRocketParameterName))
         {
+            // ? SECTION 14: Record animation trigger
+            if (PerformanceProfiler.Instance != null)
+            {
+                PerformanceProfiler.Instance.RecordAnimationTrigger($"Artillery_Aim");
+            }
+            
             _animator.SetTrigger(_aimRocketParameterName);
             Invoke(nameof(PlayFireRocket), _aimDelay);
         }
@@ -176,6 +190,12 @@ public class TroopAnimationController : MonoBehaviour
         {
             if (HasParameter(_fireRocketParameterName))
             {
+                // ? SECTION 14: Record animation trigger
+                if (PerformanceProfiler.Instance != null)
+                {
+                    PerformanceProfiler.Instance.RecordAnimationTrigger($"Artillery_Fire");
+                }
+                
                 _animator.SetTrigger(_fireRocketParameterName);
             }
             else
@@ -191,6 +211,12 @@ public class TroopAnimationController : MonoBehaviour
         {
             if (HasParameter(_hitParameterName))
             {
+                // ? SECTION 14: Record animation trigger
+                if (PerformanceProfiler.Instance != null)
+                {
+                    PerformanceProfiler.Instance.RecordAnimationTrigger("GetHit");
+                }
+                
                 _animator.SetTrigger(_hitParameterName);
             }
             else

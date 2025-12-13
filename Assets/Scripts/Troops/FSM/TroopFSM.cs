@@ -10,6 +10,13 @@ public class TroopFSM
 
     public void ChangeState(State newState)
     {
+        if (PerformanceProfiler.Instance != null && _currentState != null)
+        {
+            string fromState = _currentState.GetType().Name;
+            string toState = newState.GetType().Name;
+            PerformanceProfiler.Instance.RecordStateTransition(fromState, toState);
+        }
+
         _currentState?.Exit();
         _currentState = newState;
         _currentState.Enter();

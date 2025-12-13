@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: ArtilleryUnit
   m_EditorClassIdentifier: 
   TroopType: 2
-  MaxHealth: 15
-  Damage: 13
-  AttackRange: 35
-  AttackCooldown: 4
+  MaxHealth: 40
+  Damage: 50
+  AttackRange: 30
+  AttackCooldown: 5
   MoveSpeed: 3
-  InitialAttackDelay: 1.5
+  InitialAttackDelay: 1

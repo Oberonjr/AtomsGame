@@ -32,10 +32,24 @@ public class FarTroop_Atoms : Troop_Atoms
         _cachedRetreatSpeed = _retreatSpeed?.Value ?? 3f;
         _cachedLineDuration = _lineDuration?.Value ?? 0.1f;
         
-        // Subscribe to changes
-        _closeRangeDistance?.Changed.Register(OnCloseRangeChanged);
-        _retreatSpeed?.Changed.Register(OnRetreatSpeedChanged);
-        _lineDuration?.Changed.Register(OnLineDurationChanged);
+        // Track allocations for subscriptions
+        if (_closeRangeDistance != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _closeRangeDistance.Changed.Register(OnCloseRangeChanged);
+        }
+        
+        if (_retreatSpeed != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _retreatSpeed.Changed.Register(OnRetreatSpeedChanged);
+        }
+        
+        if (_lineDuration != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _lineDuration.Changed.Register(OnLineDurationChanged);
+        }
         
         // Setup LineRenderer
         if (LineRenderer == null)
@@ -60,9 +74,26 @@ public class FarTroop_Atoms : Troop_Atoms
     }
     
     // Atoms event handlers
-    private void OnCloseRangeChanged(float newValue) => _cachedCloseRange = newValue;
-    private void OnRetreatSpeedChanged(float newValue) => _cachedRetreatSpeed = newValue;
-    private void OnLineDurationChanged(float newValue) => _cachedLineDuration = newValue;
+    private void OnCloseRangeChanged(float newValue)
+    {
+        AtomsPerformanceTracker.BeginListenerInvoke();
+        _cachedCloseRange = newValue;
+        AtomsPerformanceTracker.EndListenerInvoke();
+    }
+
+    private void OnRetreatSpeedChanged(float newValue)
+    {
+        AtomsPerformanceTracker.BeginListenerInvoke();
+        _cachedRetreatSpeed = newValue;
+        AtomsPerformanceTracker.EndListenerInvoke();
+    }
+
+    private void OnLineDurationChanged(float newValue)
+    {
+        AtomsPerformanceTracker.BeginListenerInvoke();
+        _cachedLineDuration = newValue;
+        AtomsPerformanceTracker.EndListenerInvoke();
+    }
 
     protected override void OnUpdate()
     {

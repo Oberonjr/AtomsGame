@@ -52,17 +52,66 @@ public class ArtilleryTroop_Atoms : Troop_Atoms
         _cachedLifespan = _rocketLifespan?.Value ?? 5f;
         _cachedVFXRadius = _vfxDesignRadius?.Value ?? 1f;
         
-        // Subscribe to changes
-        _rocketInitialStraightTime?.Changed.Register(v => _cachedInitialStraightTime = v);
-        _rocketInitialSpeed?.Changed.Register(v => _cachedInitialSpeed = v);
-        _rocketMaxSpeed?.Changed.Register(v => _cachedMaxSpeed = v);
-        _rocketAcceleration?.Changed.Register(v => _cachedAcceleration = v);
-        _rocketInitialTurnSpeed?.Changed.Register(v => _cachedInitialTurnSpeed = v);
-        _rocketMaxTurnSpeed?.Changed.Register(v => _cachedMaxTurnSpeed = v);
-        _rocketTurnAcceleration?.Changed.Register(v => _cachedTurnAcceleration = v);
-        _rocketExplosionRadius?.Changed.Register(v => _cachedExplosionRadius = v);
-        _rocketLifespan?.Changed.Register(v => _cachedLifespan = v);
-        _vfxDesignRadius?.Changed.Register(v => _cachedVFXRadius = v);
+        // ADDED: Track all listener registrations
+        if (_rocketInitialStraightTime != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketInitialStraightTime.Changed.Register(v => _cachedInitialStraightTime = v);
+        }
+        
+        if (_rocketInitialSpeed != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketInitialSpeed.Changed.Register(v => _cachedInitialSpeed = v);
+        }
+        
+        if (_rocketMaxSpeed != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketMaxSpeed.Changed.Register(v => _cachedMaxSpeed = v);
+        }
+        
+        if (_rocketAcceleration != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketAcceleration.Changed.Register(v => _cachedAcceleration = v);
+        }
+        
+        if (_rocketInitialTurnSpeed != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketInitialTurnSpeed.Changed.Register(v => _cachedInitialTurnSpeed = v);
+        }
+        
+        if (_rocketMaxTurnSpeed != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketMaxTurnSpeed.Changed.Register(v => _cachedMaxTurnSpeed = v);
+        }
+        
+        if (_rocketTurnAcceleration != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketTurnAcceleration.Changed.Register(v => _cachedTurnAcceleration = v);
+        }
+        
+        if (_rocketExplosionRadius != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketExplosionRadius.Changed.Register(v => _cachedExplosionRadius = v);
+        }
+        
+        if (_rocketLifespan != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _rocketLifespan.Changed.Register(v => _cachedLifespan = v);
+        }
+        
+        if (_vfxDesignRadius != null)
+        {
+            AtomsPerformanceTracker.TrackAllocation(64);
+            _vfxDesignRadius.Changed.Register(v => _cachedVFXRadius = v);
+        }
     }
     
     void OnDestroy()

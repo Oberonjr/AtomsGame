@@ -4,10 +4,12 @@ using System.Linq;
 using System.IO;
 using System.Text;
 using Unity.Profiling;
+using System;
+using System.Runtime.Serialization;
 
 /// <summary>
 /// Comprehensive performance profiler for comparing Unity vs Atoms implementations
-/// Tracks separate phases: Prep, Simulation, Win
+/// Tracks separate phases: Prep, Simulation, Win with deep metrics
 /// </summary>
 public class PerformanceProfiler : MonoBehaviour
 {
@@ -21,8 +23,10 @@ public class PerformanceProfiler : MonoBehaviour
     [SerializeField] private string _exportPath = "PerformanceData";
 
     [Header("Display")]
-    [SerializeField] private bool _showOnScreenStats = true;
     [SerializeField] private KeyCode _toggleStatsKey = KeyCode.F1;
+
+    [Header("Deep Profiling")]
+    [SerializeField] private bool _trackWarmupPhase = true;
 
     private SimulationMode _currentMode;
     private GameState _currentPhase = GameState.Prep;
@@ -35,21 +39,106 @@ public class PerformanceProfiler : MonoBehaviour
     private bool _isProfiling;
     private System.Diagnostics.Stopwatch _sessionTimer;
     private System.Diagnostics.Stopwatch _phaseTimer;
+    private System.Diagnostics.Stopwatch _warmupTimer;
 
-    // Atoms-specific tracking
-    private int _scriptableObjectsLoaded;
+    // ========== ATOMS-SPECIFIC TRACKING ==========
+    
+    // 1. Event System Metrics
     private int _atomsEventDispatches;
+    private int _atomsEventListenerInvocations;
+    private long _totalEventDispatchTime; // Microseconds
+    private long _minEventDispatchTime = long.MaxValue;
+    private long _maxEventDispatchTime = long.MinValue;
+    private Dictionary<string, int> _eventFrequencyPerFrame = new Dictionary<string, int>();
+    private int _eventsThisFrame;
+    private List<float> _eventSpikeHistory = new List<float>();
+    
+    // 2. Variable Access Metrics
     private int _atomsVariableReads;
     private int _atomsVariableWrites;
+    private long _totalVariableReadTime; // Microseconds
+    private long _totalVariableWriteTime;
+    private int _cascadingWrites; // Writes that trigger other writes
+    private int _chainedDependencies; // Max depth of variable dependency
+    
+    // 3. ScriptableObject Metrics
+    private int _scriptableObjectsLoaded;
+    private float _scriptableObjectLoadTime;
+    private long _scriptableObjectMemoryFootprint;
+    
+    // 4. Instancer Metrics
+    private int _instancersCreated;
+    private float _instancerCreationTime;
+    private long _instancerMemoryPerUnit;
+    private int _instancerDestroyCount;
+    
+    // 5. Collection Metrics (Atoms Lists/Dicts)
+    private int _atomsCollectionAdds;
+    private int _atomsCollectionRemoves;
+    private long _totalCollectionAddTime;
+    private long _totalCollectionRemoveTime;
+    private Dictionary<int, float> _collectionSizePerformance = new Dictionary<int, float>();
+    
+    // 6. Memory Behavior
     private long _atomsAllocationBytes;
+    private int _atomsGCSpikes; // Sharp GC increases
+    private List<long> _memorySnapshots = new List<long>();
+    private float _heapFragmentation; // Estimated
+    
+    // 7. Timing & Latency
+    private List<float> _eventLatencies = new List<float>(); // Time from cause to effect
+    private float _avgEventLatency;
+    private float _maxEventLatency;
+    
+    // 8. Warm-up Metrics
+    private bool _inWarmupPhase = true;
+    private float _warmupDuration;
+    private WarmupMetrics _warmupMetrics;
+    
+    // 9. Cache & Access Patterns
+    private int _indirectionLookups;
+    private long _totalIndirectionTime;
 
-    // Unity Profiler Markers
-    private static readonly ProfilerMarker _eventDispatchMarker = new ProfilerMarker("Atoms.EventDispatch");
-    private static readonly ProfilerMarker _variableReadMarker = new ProfilerMarker("Atoms.VariableRead");
-    private static readonly ProfilerMarker _variableWriteMarker = new ProfilerMarker("Atoms.VariableWrite");
+    // 10. Projectile Metrics (rockets, bullets, etc.)
+    private int _projectilesSpawned;
+    private int _projectileRetargets;
+    private int _splashDamageHits; // Units hit by splash damage
+    private int _totalSplashDamage;
+
+    // 11. NavMesh Metrics
+    private int _navMeshPathRecalculations;
+    private int _navMeshAgentStucks;
+    private float _totalNavMeshPathLength;
+
+    // 12. FSM State Transition Metrics
+    private Dictionary<string, int> _stateTransitions = new Dictionary<string, int>();
+    private int _totalStateTransitions;
+
+    // 13. Animation Metrics
+    private int _animationTriggers;
+    private Dictionary<string, int> _animationFrequency = new Dictionary<string, int>();
+
+    // Unity Profiler Markers (Enhanced)
+    private static readonly ProfilerMarker _eventDispatchMarker = new ProfilerMarker("Atoms.Event.Dispatch");
+    private static readonly ProfilerMarker _eventPropagationMarker = new ProfilerMarker("Atoms.Event.Propagation");
+    private static readonly ProfilerMarker _variableReadMarker = new ProfilerMarker("Atoms.Variable.Read");
+    private static readonly ProfilerMarker _variableWriteMarker = new ProfilerMarker("Atoms.Variable.Write");
+    private static readonly ProfilerMarker _instancerCreateMarker = new ProfilerMarker("Atoms.Instancer.Create");
+    private static readonly ProfilerMarker _collectionModifyMarker = new ProfilerMarker("Atoms.Collection.Modify");
+    private static readonly ProfilerMarker _listenerInvokeMarker = new ProfilerMarker("Atoms.Listener.Invoke");
+    
+    // Profiler Recorders (for Unity's internal metrics)
+    private ProfilerRecorder _mainThreadTimeRecorder;
+    private ProfilerRecorder _gcAllocRecorder;
+    private ProfilerRecorder _drawCallsRecorder;
+    private ProfilerRecorder _batchesRecorder;
 
     private bool _showStats = true;
     private string _sessionId;
+    private string _profiledSceneName;
+
+    // Add state entry counts
+    private Dictionary<GameState, int> _stateEntryCounts = new Dictionary<GameState, int>();
 
     void Awake()
     {
@@ -66,16 +155,26 @@ public class PerformanceProfiler : MonoBehaviour
 
         _sessionTimer = new System.Diagnostics.Stopwatch();
         _phaseTimer = new System.Diagnostics.Stopwatch();
+        _warmupTimer = new System.Diagnostics.Stopwatch();
         
         // Initialize phase data
         _phaseData[GameState.Prep] = new PhaseData(GameState.Prep);
         _phaseData[GameState.Simulate] = new PhaseData(GameState.Simulate);
         _phaseData[GameState.Win] = new PhaseData(GameState.Win);
+        
+        // Initialize state entry counts
+        foreach (GameState gs in Enum.GetValues(typeof(GameState)))
+            _stateEntryCounts[gs] =0;
+        
+        // Initialize profiler recorders
+        _mainThreadTimeRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Main Thread", 15);
+        _gcAllocRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC.Alloc", 15);
+        _drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count", 15);
+        _batchesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Batches Count", 15);
     }
 
     void OnEnable()
     {
-        // Subscribe to scene changes
         UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
         UnityEngine.SceneManagement.SceneManager.sceneUnloaded += OnSceneUnloaded;
     }
@@ -84,6 +183,12 @@ public class PerformanceProfiler : MonoBehaviour
     {
         UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
         UnityEngine.SceneManagement.SceneManager.sceneUnloaded -= OnSceneUnloaded;
+        
+        // Dispose recorders
+        _mainThreadTimeRecorder.Dispose();
+        _gcAllocRecorder.Dispose();
+        _drawCallsRecorder.Dispose();
+        _batchesRecorder.Dispose();
     }
 
     void OnApplicationQuit()
@@ -98,8 +203,8 @@ public class PerformanceProfiler : MonoBehaviour
     {
         Debug.Log($"[PerformanceProfiler] Scene loaded: {scene.name}");
         
-        // Start profiling when entering game scene
-        if (scene.name == "GameScene" && SimulationConfig.Instance != null)
+        // Start profiling when SimulationConfig is present in the loaded scene (assumes Sim runs in scenes with SimulationConfig)
+        if (SimulationConfig.Instance != null)
         {
             StartProfiling(SimulationConfig.Instance.Mode);
         }
@@ -109,10 +214,21 @@ public class PerformanceProfiler : MonoBehaviour
     {
         Debug.Log($"[PerformanceProfiler] Scene unloaded: {scene.name}");
         
-        // Stop profiling when leaving game scene
-        if (scene.name == "GameScene" && _isProfiling)
+        if (_isProfiling && !string.IsNullOrEmpty(_profiledSceneName) && scene.name == _profiledSceneName)
         {
+            // Stop profiling and buffer export data
             StopProfiling();
+
+            // Ensure buffered data is written now that profiled scene is unloading.
+            try
+            {
+                SessionFileSaver.Instance.ForceSave();
+                Debug.Log("[PerformanceProfiler] Forced SessionFileSaver to save buffered files on profiled scene unload.");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PerformanceProfiler] Failed to force save session files: {e.Message}");
+            }
         }
     }
 
@@ -125,10 +241,16 @@ public class PerformanceProfiler : MonoBehaviour
 
         if (!_enableProfiling || !_isProfiling) return;
 
-                // Track phase changes
+        // Track phase changes
         if (GameStateManager.Instance != null && GameStateManager.Instance.CurrentState != _currentPhase)
         {
             ChangePhase(GameStateManager.Instance.CurrentState);
+        }
+
+        // Check warm-up phase
+        if (_inWarmupPhase && _warmupTimer.Elapsed.TotalSeconds >= 3.0)
+        {
+            EndWarmupPhase();
         }
 
         // Update current phase data
@@ -141,11 +263,26 @@ public class PerformanceProfiler : MonoBehaviour
             if (deltaTime < _currentPhaseData.MinFrameTime) _currentPhaseData.MinFrameTime = deltaTime;
             if (deltaTime > _currentPhaseData.MaxFrameTime) _currentPhaseData.MaxFrameTime = deltaTime;
 
-            // Update peak memory
+            // Track memory
             long currentMemory = System.GC.GetTotalMemory(false);
             if (currentMemory > _currentPhaseData.PeakMemory)
             {
                 _currentPhaseData.PeakMemory = currentMemory;
+            }
+            
+            // Track GC spikes
+            int currentGC0 = System.GC.CollectionCount(0);
+            if (currentGC0 > _currentPhaseData.LastGC0Count)
+            {
+                _atomsGCSpikes++;
+                _currentPhaseData.LastGC0Count = currentGC0;
+            }
+            
+            // Track memory snapshots for fragmentation estimation
+            _memorySnapshots.Add(currentMemory);
+            if (_memorySnapshots.Count > 100)
+            {
+                _memorySnapshots.RemoveAt(0);
             }
 
             // Sample at interval
@@ -153,6 +290,22 @@ public class PerformanceProfiler : MonoBehaviour
             {
                 RecordSample();
                 _lastSampleTime = Time.unscaledTime;
+            }
+        }
+        
+        // Per-frame event tracking
+        _eventsThisFrame = 0;
+    }
+
+    void LateUpdate()
+    {
+        // Record event spikes
+        if (_eventsThisFrame > 0)
+        {
+            _eventSpikeHistory.Add(_eventsThisFrame);
+            if (_eventSpikeHistory.Count > 1000)
+            {
+                _eventSpikeHistory.RemoveAt(0);
             }
         }
     }
@@ -163,7 +316,11 @@ public class PerformanceProfiler : MonoBehaviour
         if (_isProfiling)
         {
             Debug.LogWarning("[PerformanceProfiler] Already profiling, stopping previous session");
+            // CHANGED: Don't auto-export when starting a new session
+            bool originalAutoExport = _autoExportOnEnd;
+            _autoExportOnEnd = false;
             StopProfiling();
+            _autoExportOnEnd = originalAutoExport;
         }
 
         _currentMode = mode;
@@ -178,16 +335,19 @@ public class PerformanceProfiler : MonoBehaviour
         _currentPhase = GameState.Prep;
         _currentPhaseData = _phaseData[_currentPhase];
 
-        // Atoms-specific initialization
-        _scriptableObjectsLoaded = 0;
-        _atomsEventDispatches = 0;
-        _atomsVariableReads = 0;
-        _atomsVariableWrites = 0;
-        _atomsAllocationBytes = 0;
+        // Reset all metrics
+        ResetMetrics();
 
+        // Mark first entry into starting phase
+        if (!_stateEntryCounts.ContainsKey(_currentPhase))
+            _stateEntryCounts[_currentPhase] = 0;
+        _stateEntryCounts[_currentPhase]++;
+
+        // Atoms-specific initialization
         if (mode == SimulationMode.Atoms)
         {
             CountScriptableObjects();
+            StartWarmupTracking();
         }
 
         _lastSampleTime = Time.unscaledTime;
@@ -195,7 +355,118 @@ public class PerformanceProfiler : MonoBehaviour
         _phaseTimer.Restart();
         _isProfiling = true;
 
+        // Ensure SessionFileSaver exists early so it receives scene change events
+        try
+        {
+            SessionFileSaver.Instance.BeginSession(_sessionId, mode);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[PerformanceProfiler] Could not begin session in SessionFileSaver: {e.Message}");
+        }
+
+        // Remember which scene we're profiling so we can detect its unload
+        _profiledSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
         Debug.Log($"[PerformanceProfiler] Started profiling {mode} mode - Session ID: {_sessionId}");
+    }
+
+    private void ResetMetrics()
+    {
+        // Event metrics
+        _atomsEventDispatches = 0;
+        _atomsEventListenerInvocations = 0;
+        _totalEventDispatchTime = 0;
+        _minEventDispatchTime = long.MaxValue;
+        _maxEventDispatchTime = long.MinValue;
+        _eventFrequencyPerFrame.Clear();
+        _eventsThisFrame = 0;
+        _eventSpikeHistory.Clear();
+        
+        // Variable metrics
+        _atomsVariableReads = 0;
+        _atomsVariableWrites = 0;
+        _totalVariableReadTime = 0;
+        _totalVariableWriteTime = 0;
+        _cascadingWrites = 0;
+        _chainedDependencies = 0;
+        
+        // SO metrics
+        _scriptableObjectsLoaded = 0;
+        _scriptableObjectLoadTime = 0;
+        _scriptableObjectMemoryFootprint = 0;
+        
+        // Instancer metrics
+        _instancersCreated = 0;
+        _instancerCreationTime = 0;
+        _instancerMemoryPerUnit = 0;
+        _instancerDestroyCount = 0;
+        
+        // Collection metrics
+        _atomsCollectionAdds = 0;
+        _atomsCollectionRemoves = 0;
+        _totalCollectionAddTime = 0;
+        _totalCollectionRemoveTime = 0;
+        _collectionSizePerformance.Clear();
+        
+        // Memory metrics
+        _atomsAllocationBytes = 0;
+        _atomsGCSpikes = 0;
+        _memorySnapshots.Clear();
+        _heapFragmentation = 0;
+        
+        // Timing metrics
+        _eventLatencies.Clear();
+        _avgEventLatency = 0;
+        _maxEventLatency = 0;
+        
+        // Cache metrics
+        _indirectionLookups = 0;
+        _totalIndirectionTime = 0;
+
+        // Projectile metrics
+        _projectilesSpawned = 0;
+        _projectileRetargets = 0;
+        _splashDamageHits = 0;
+        _totalSplashDamage = 0;
+
+        // NavMesh metrics
+        _navMeshPathRecalculations = 0;
+        _navMeshAgentStucks = 0;
+        _totalNavMeshPathLength = 0;
+
+        // FSM State Transition metrics
+        _stateTransitions.Clear();
+        _totalStateTransitions = 0;
+
+        // Animation metrics
+        _animationTriggers = 0;
+        _animationFrequency.Clear();
+    }
+
+    private void StartWarmupTracking()
+    {
+        _inWarmupPhase = true;
+        _warmupTimer.Restart();
+        _warmupMetrics = new WarmupMetrics
+        {
+            StartTime = Time.realtimeSinceStartup,
+            StartMemory = System.GC.GetTotalMemory(false),
+            StartGC0 = System.GC.CollectionCount(0)
+        };
+    }
+
+    private void EndWarmupPhase()
+    {
+        _inWarmupPhase = false;
+        _warmupDuration = (float)_warmupTimer.Elapsed.TotalSeconds;
+        
+        _warmupMetrics.EndTime = Time.realtimeSinceStartup;
+        _warmupMetrics.EndMemory = System.GC.GetTotalMemory(false);
+        _warmupMetrics.EndGC0 = System.GC.CollectionCount(0);
+        _warmupMetrics.Duration = _warmupDuration;
+        
+        Debug.Log($"[PerformanceProfiler] Warm-up phase ended after {_warmupDuration:F2}s");
     }
 
     public void StopProfiling()
@@ -220,16 +491,19 @@ public class PerformanceProfiler : MonoBehaviour
 
         Debug.Log($"[PerformanceProfiler] Phase changed: {_currentPhase} -> {newPhase}");
 
-        // Stop timer for current phase
         if (_currentPhaseData != null)
         {
             _currentPhaseData.Duration = _phaseTimer.Elapsed.TotalSeconds;
         }
 
-        // Switch to new phase
         _currentPhase = newPhase;
         _currentPhaseData = _phaseData[newPhase];
         _phaseTimer.Restart();
+
+        // Track how many times session entered each state
+        if (!_stateEntryCounts.ContainsKey(newPhase))
+            _stateEntryCounts[newPhase] =0;
+        _stateEntryCounts[newPhase]++;
     }
 
     private void RecordSample()
@@ -245,7 +519,14 @@ public class PerformanceProfiler : MonoBehaviour
             ActiveUnits = GetActiveUnitCount(),
             GCCount0 = System.GC.CollectionCount(0) - _currentPhaseData.StartGC0,
             GCCount1 = System.GC.CollectionCount(1) - _currentPhaseData.StartGC1,
-            GCCount2 = System.GC.CollectionCount(2) - _currentPhaseData.StartGC2
+            GCCount2 = System.GC.CollectionCount(2) - _currentPhaseData.StartGC2,
+            
+            // Enhanced metrics
+            EventsThisFrame = _eventsThisFrame,
+            MainThreadTime = _mainThreadTimeRecorder.LastValue / 1000000f, // Convert to ms
+            GCAllocThisFrame = _gcAllocRecorder.LastValue,
+            DrawCalls = (int)_drawCallsRecorder.LastValue,
+            Batches = (int)_batchesRecorder.LastValue
         };
 
         _currentPhaseData.Samples.Add(sample);
@@ -262,8 +543,22 @@ public class PerformanceProfiler : MonoBehaviour
 
     private void CountScriptableObjects()
     {
-        _scriptableObjectsLoaded = Resources.FindObjectsOfTypeAll<ScriptableObject>().Length;
+        var allSOs = Resources.FindObjectsOfTypeAll<ScriptableObject>();
+        _scriptableObjectsLoaded = allSOs.Length;
+        
+        // Estimate memory footprint
+        _scriptableObjectMemoryFootprint = 0;
+        foreach (var so in allSOs)
+        {
+            if (so != null)
+            {
+                // Rough estimate: 128 bytes per SO asset
+                _scriptableObjectMemoryFootprint += 128;
+            }
+        }
     }
+
+    // ========== PUBLIC TRACKING API ==========
 
     // Combat event tracking
     public void RecordDamage(int damage)
@@ -294,11 +589,36 @@ public class PerformanceProfiler : MonoBehaviour
     public void RecordAtomsEventDispatch()
     {
         _atomsEventDispatches++;
+        _eventsThisFrame++;
+    }
+
+    public void RecordAtomsEventDispatchWithTiming(long microseconds)
+    {
+        _atomsEventDispatches++;
+        _eventsThisFrame++;
+        _totalEventDispatchTime += microseconds;
+        
+        if (microseconds < _minEventDispatchTime) _minEventDispatchTime = microseconds;
+        if (microseconds > _maxEventDispatchTime) _maxEventDispatchTime = microseconds;
+    }
+
+    public void RecordAtomsListenerInvocation()
+    {
+        _atomsEventListenerInvocations++;
     }
 
     public void RecordAtomsVariableRead()
     {
         _atomsVariableReads++;
+        _indirectionLookups++;
+    }
+
+    public void RecordAtomsVariableReadWithTiming(long microseconds)
+    {
+        _atomsVariableReads++;
+        _indirectionLookups++;
+        _totalVariableReadTime += microseconds;
+        _totalIndirectionTime += microseconds;
     }
 
     public void RecordAtomsVariableWrite()
@@ -306,347 +626,116 @@ public class PerformanceProfiler : MonoBehaviour
         _atomsVariableWrites++;
     }
 
-    public void RecordAtomsAllocation(long bytes)
+    public void RecordAtomsVariableWriteWithTiming(long microseconds)
+    {
+        _atomsVariableWrites++;
+        _totalVariableWriteTime += microseconds;
+    }
+
+    public void RecordCascadingWrite()
+    {
+        _cascadingWrites++;
+    }
+
+    public void RecordAllocation(long bytes)
     {
         _atomsAllocationBytes += bytes;
     }
 
-    public void ExportData()
+    public void RecordInstancerCreated(float creationTime)
     {
-        string directory = Path.Combine(Application.persistentDataPath, _exportPath);
-        if (!Directory.Exists(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        string baseFilename = $"{_currentMode}_{_sessionId}";
-
-        // Export phase-specific CSVs
-        foreach (var kvp in _phaseData)
-        {
-            if (kvp.Value.Samples.Count > 0)
-            {
-                string csvPath = Path.Combine(directory, $"{baseFilename}_{kvp.Key}.csv");
-                ExportPhaseCSV(csvPath, kvp.Value);
-            }
-        }
-
-        // Export comprehensive summary
-        string summaryPath = Path.Combine(directory, $"{baseFilename}_Summary.txt");
-        ExportComprehensiveSummary(summaryPath);
-
-        // Export machine-readable JSON for comparison tool
-        string jsonPath = Path.Combine(directory, $"{baseFilename}_Data.json");
-        ExportJSON(jsonPath);
-
-        Debug.Log($"[PerformanceProfiler] Exported all data to: {directory}");
+        _instancersCreated++;
+        _instancerCreationTime += creationTime;
     }
 
-    private void ExportPhaseCSV(string filepath, PhaseData phase)
+    public void RecordInstancerDestroyed()
     {
-        StringBuilder csv = new StringBuilder();
-        csv.AppendLine("Timestamp,FPS,FrameTimeMs,MemoryMB,ActiveUnits,GC0,GC1,GC2");
-
-        foreach (var sample in phase.Samples)
-        {
-            csv.AppendLine($"{sample.Timestamp:F3},{sample.FPS:F2},{sample.FrameTime:F3}," +
-                          $"{sample.MemoryUsageMB:F2},{sample.ActiveUnits}," +
-                          $"{sample.GCCount0},{sample.GCCount1},{sample.GCCount2}");
-        }
-
-        File.WriteAllText(filepath, csv.ToString());
+        _instancerDestroyCount++;
     }
 
-    private void ExportComprehensiveSummary(string filepath)
+    public void RecordCollectionAdd(long microseconds, int collectionSize)
     {
-        StringBuilder summary = new StringBuilder();
-
-        summary.AppendLine("╔════════════════════════════════════════════════════════════════╗");
-        summary.AppendLine("║          COMPREHENSIVE PERFORMANCE SUMMARY                     ║");
-        summary.AppendLine("╚════════════════════════════════════════════════════════════════╝");
-        summary.AppendLine();
-        summary.AppendLine($"Mode: {_currentMode}");
-        summary.AppendLine($"Session ID: {_sessionId}");
-        summary.AppendLine($"Date: {System.DateTime.Now}");
-        summary.AppendLine($"Total Duration: {_sessionTimer.Elapsed.TotalSeconds:F2} seconds");
-        summary.AppendLine();
-
-        // Per-phase summaries
-        foreach (var kvp in _phaseData)
+        _atomsCollectionAdds++;
+        _totalCollectionAddTime += microseconds;
+        
+        if (!_collectionSizePerformance.ContainsKey(collectionSize))
         {
-            GameState phase = kvp.Key;
-            PhaseData data = kvp.Value;
-
-            if (data.Samples.Count == 0) continue;
-
-            summary.AppendLine($"┌─────────────────────────────────────────────────────────────┐");
-            summary.AppendLine($"│ PHASE: {phase,-53} │");
-            summary.AppendLine($"└─────────────────────────────────────────────────────────────┘");
-            summary.AppendLine($"Duration: {data.Duration:F2}s");
-            summary.AppendLine();
-
-            // FPS Statistics
-            var fpsSamples = data.Samples.Select(s => s.FPS).ToList();
-            summary.AppendLine("─── FPS Statistics ───");
-            summary.AppendLine($"  Average: {fpsSamples.Average():F2}");
-            summary.AppendLine($"  Min: {fpsSamples.Min():F2}");
-            summary.AppendLine($"  Max: {fpsSamples.Max():F2}");
-            summary.AppendLine($"  Median: {GetMedian(fpsSamples):F2}");
-            summary.AppendLine($"  1% Low: {GetPercentile(fpsSamples, 0.01f):F2}");
-            summary.AppendLine($"  0.1% Low: {GetPercentile(fpsSamples, 0.001f):F2}");
-            summary.AppendLine();
-
-            // Frame Time Statistics
-            var frameTimeSamples = data.Samples.Select(s => s.FrameTime).ToList();
-            summary.AppendLine("─── Frame Time (ms) ───");
-            summary.AppendLine($"  Average: {frameTimeSamples.Average():F3}");
-            summary.AppendLine($"  Min: {frameTimeSamples.Min():F3}");
-            summary.AppendLine($"  Max: {frameTimeSamples.Max():F3}");
-            summary.AppendLine($"  95th Percentile: {GetPercentile(frameTimeSamples, 0.95f):F3}");
-            summary.AppendLine($"  99th Percentile: {GetPercentile(frameTimeSamples, 0.99f):F3}");
-            summary.AppendLine();
-
-            // Memory Statistics
-            var memorySamples = data.Samples.Select(s => s.MemoryUsageMB).ToList();
-            summary.AppendLine("─── Memory (MB) ───");
-            summary.AppendLine($"  Start: {data.StartMemory / (1024f * 1024f):F2}");
-            summary.AppendLine($"  Peak: {data.PeakMemory / (1024f * 1024f):F2}");
-            summary.AppendLine($"  Average: {memorySamples.Average():F2}");
-            summary.AppendLine($"  Allocated: {(data.PeakMemory - data.StartMemory) / (1024f * 1024f):F2}");
-            summary.AppendLine();
-
-            // GC Statistics
-            summary.AppendLine("─── Garbage Collection ───");
-            summary.AppendLine($"  Gen 0: {data.Samples.LastOrDefault().GCCount0}");
-            summary.AppendLine($"  Gen 1: {data.Samples.LastOrDefault().GCCount1}");
-            summary.AppendLine($"  Gen 2: {data.Samples.LastOrDefault().GCCount2}");
-            summary.AppendLine();
-
-            // Combat Statistics (only for Simulate phase)
-            if (phase == GameState.Simulate)
-            {
-                summary.AppendLine("─── Combat Statistics ───");
-                summary.AppendLine($"  Units Spawned: {data.TotalUnitsSpawned}");
-                summary.AppendLine($"  Units Died: {data.TotalUnitsDied}");
-                summary.AppendLine($"  Total Attacks: {data.TotalAttacks}");
-                summary.AppendLine($"  Total Damage: {data.TotalDamageDealt}");
-                if (data.TotalAttacks > 0)
-                {
-                    summary.AppendLine($"  Avg Damage/Attack: {(float)data.TotalDamageDealt / data.TotalAttacks:F2}");
-                }
-                summary.AppendLine();
-            }
-
-            summary.AppendLine();
+            _collectionSizePerformance[collectionSize] = 0;
         }
-
-        // Atoms-specific metrics
-        if (_currentMode == SimulationMode.Atoms)
-        {
-            summary.AppendLine("┌─────────────────────────────────────────────────────────────┐");
-            summary.AppendLine("│ ATOMS-SPECIFIC METRICS                                      │");
-            summary.AppendLine("└─────────────────────────────────────────────────────────────┘");
-            summary.AppendLine($"  ScriptableObjects Loaded: {_scriptableObjectsLoaded}");
-            summary.AppendLine($"  Event Dispatches: {_atomsEventDispatches}");
-            summary.AppendLine($"  Variable Reads: {_atomsVariableReads}");
-            summary.AppendLine($"  Variable Writes: {_atomsVariableWrites}");
-            summary.AppendLine($"  Atoms Allocations: {_atomsAllocationBytes / (1024f * 1024f):F2} MB");
-            
-            // Calculate overhead per operation
-            PhaseData simPhase = _phaseData[GameState.Simulate];
-            if (simPhase.Samples.Count > 0)
-            {
-                float avgFrameTime = simPhase.Samples.Select(s => s.FrameTime).Average();
-                float eventOverhead = _atomsEventDispatches > 0 ? (avgFrameTime / _atomsEventDispatches) : 0f;
-                summary.AppendLine($"  Avg Event Overhead: {eventOverhead:F6} ms/event");
-            }
-            summary.AppendLine();
-        }
-
-        File.WriteAllText(filepath, summary.ToString());
+        _collectionSizePerformance[collectionSize] += microseconds / 1000f; // Convert to ms
     }
 
-    private void ExportJSON(string filepath)
+    public void RecordCollectionRemove(long microseconds)
     {
-        var exportData = new SessionExportData
-        {
-            Mode = _currentMode.ToString(),
-            SessionId = _sessionId,
-            TotalDuration = _sessionTimer.Elapsed.TotalSeconds,
-            Phases = new List<PhaseExportData>()
-        };
-
-        foreach (var kvp in _phaseData)
-        {
-            if (kvp.Value.Samples.Count == 0) continue;
-
-            var phaseExport = new PhaseExportData
-            {
-                Phase = kvp.Key.ToString(),
-                Duration = kvp.Value.Duration,
-                AvgFPS = kvp.Value.Samples.Select(s => s.FPS).Average(),
-                MinFPS = kvp.Value.Samples.Select(s => s.FPS).Min(),
-                MaxFPS = kvp.Value.Samples.Select(s => s.FPS).Max(),
-                AvgFrameTime = kvp.Value.Samples.Select(s => s.FrameTime).Average(),
-                PeakMemoryMB = kvp.Value.PeakMemory / (1024f * 1024f),
-                GC0 = kvp.Value.Samples.LastOrDefault().GCCount0,
-                GC1 = kvp.Value.Samples.LastOrDefault().GCCount1,
-                GC2 = kvp.Value.Samples.LastOrDefault().GCCount2,
-                TotalAttacks = kvp.Value.TotalAttacks,
-                TotalDamage = kvp.Value.TotalDamageDealt,
-                UnitsSpawned = kvp.Value.TotalUnitsSpawned,
-                UnitsDied = kvp.Value.TotalUnitsDied
-            };
-
-            exportData.Phases.Add(phaseExport);
-        }
-
-        // Atoms-specific data
-        if (_currentMode == SimulationMode.Atoms)
-        {
-            exportData.AtomsMetrics = new AtomsMetricsData
-            {
-                ScriptableObjectsLoaded = _scriptableObjectsLoaded,
-                EventDispatches = _atomsEventDispatches,
-                VariableReads = _atomsVariableReads,
-                VariableWrites = _atomsVariableWrites,
-                AllocationBytes = _atomsAllocationBytes
-            };
-        }
-
-        string json = JsonUtility.ToJson(exportData, true);
-        File.WriteAllText(filepath, json);
+        _atomsCollectionRemoves++;
+        _totalCollectionRemoveTime += microseconds;
     }
 
-    private float GetMedian(List<float> values)
+    public void RecordEventLatency(float latencyMs)
     {
-        var sorted = values.OrderBy(v => v).ToList();
-        int mid = sorted.Count / 2;
-        return sorted.Count % 2 == 0 ? (sorted[mid - 1] + sorted[mid]) / 2f : sorted[mid];
-    }
-
-    private float GetPercentile(List<float> values, float percentile)
-    {
-        var sorted = values.OrderBy(v => v).ToList();
-        int index = Mathf.Clamp((int)(sorted.Count * percentile), 0, sorted.Count - 1);
-        return sorted[index];
-    }
-
-    void OnGUI()
-    {
-        if (!_showOnScreenStats || !_showStats || !_isProfiling || _currentPhaseData == null) return;
-
-        int yOffset = 10;
-        int lineHeight = 20;
-        int xOffset = 10;
-        int width = 400;
-
-        GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
-        boxStyle.normal.background = MakeTex(2, 2, new Color(0, 0, 0, 0.8f));
-
-        GUI.Box(new Rect(5, 5, width, 280), "", boxStyle);
-
-        GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
-        labelStyle.fontSize = 12;
-        labelStyle.normal.textColor = Color.white;
-        labelStyle.fontStyle = FontStyle.Bold;
-
-        // Title
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"<b><size=14>Performance Stats - {_currentMode} - {_currentPhase}</size></b>", labelStyle);
-        yOffset += lineHeight + 5;
-
-        // Current FPS
-        float currentFPS = 1f / Time.unscaledDeltaTime;
-        Color fpsColor = currentFPS >= 60 ? Color.green : currentFPS >= 30 ? Color.yellow : Color.red;
-        labelStyle.normal.textColor = fpsColor;
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"FPS: {currentFPS:F1}", labelStyle);
-        yOffset += lineHeight;
-
-        labelStyle.normal.textColor = Color.white;
-
-        // Frame time
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"Frame Time: {Time.unscaledDeltaTime * 1000f:F2} ms", labelStyle);
-        yOffset += lineHeight;
-
-        // Memory
-        float memoryMB = System.GC.GetTotalMemory(false) / (1024f * 1024f);
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"Memory: {memoryMB:F2} MB (Peak: {_currentPhaseData.PeakMemory / (1024f * 1024f):F2})", labelStyle);
-        yOffset += lineHeight;
-
-        // Active units
-        int activeUnits = GetActiveUnitCount();
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"Active Units: {activeUnits}", labelStyle);
-        yOffset += lineHeight;
-
-        // Phase duration
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"Phase Time: {_phaseTimer.Elapsed.TotalSeconds:F1}s", labelStyle);
-        yOffset += lineHeight;
-
-        // Session duration
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"Session Time: {_sessionTimer.Elapsed.TotalSeconds:F1}s", labelStyle);
-        yOffset += lineHeight;
-
-        // Statistics (if samples available)
-        if (_currentPhaseData.Samples.Count > 0)
+        _eventLatencies.Add(latencyMs);
+        if (latencyMs > _maxEventLatency)
         {
-            var recentSamples = _currentPhaseData.Samples.TakeLast(100).ToList();
-            float avgFPS = recentSamples.Select(s => s.FPS).Average();
-            float minFPS = recentSamples.Select(s => s.FPS).Min();
-
-            GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                      $"Avg FPS (recent): {avgFPS:F1}", labelStyle);
-            yOffset += lineHeight;
-
-            GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                      $"Min FPS (recent): {minFPS:F1}", labelStyle);
-            yOffset += lineHeight;
+            _maxEventLatency = latencyMs;
         }
-
-        // Combat stats
-        if (_currentPhase == GameState.Simulate)
-        {
-            GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                      $"Attacks: {_currentPhaseData.TotalAttacks}", labelStyle);
-            yOffset += lineHeight;
-
-            GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                      $"Damage: {_currentPhaseData.TotalDamageDealt}", labelStyle);
-            yOffset += lineHeight;
-        }
-
-        // Atoms metrics
-        if (_currentMode == SimulationMode.Atoms)
-        {
-            GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                      $"Atoms Events: {_atomsEventDispatches}", labelStyle);
-            yOffset += lineHeight;
-        }
-
-        // Toggle hint
-        labelStyle.fontSize = 10;
-        GUI.Label(new Rect(xOffset, yOffset, width, lineHeight),
-                  $"Press {_toggleStatsKey} to toggle", labelStyle);
     }
 
-    private Texture2D MakeTex(int width, int height, Color col)
+    public void RecordProjectileSpawned()
     {
-        Color[] pix = new Color[width * height];
-        for (int i = 0; i < pix.Length; i++)
-            pix[i] = col;
-        Texture2D result = new Texture2D(width, height);
-        result.SetPixels(pix);
-        result.Apply();
-        return result;
+        _projectilesSpawned++;
     }
 
-    // Data structures
+    public void RecordProjectileRetarget()
+    {
+        _projectileRetargets++;
+    }
+
+    public void RecordSplashDamage(int unitsHit, int totalDamage)
+    {
+        _splashDamageHits += unitsHit;
+        _totalSplashDamage += totalDamage;
+    }
+
+    public void RecordNavMeshRecalculation()
+    {
+        _navMeshPathRecalculations++;
+    }
+
+    public void RecordNavMeshStuck()
+    {
+        _navMeshAgentStucks++;
+    }
+
+    public void RecordNavMeshPathLength(float length)
+    {
+        _totalNavMeshPathLength += length;
+    }
+
+    public void RecordStateTransition(string fromState, string toState)
+    {
+        _totalStateTransitions++;
+        string key = $"{fromState}→{toState}";
+        
+        if (!_stateTransitions.ContainsKey(key))
+        {
+            _stateTransitions[key] = 0;
+        }
+        _stateTransitions[key]++;
+    }
+
+    public void RecordAnimationTrigger(string animationName)
+    {
+        _animationTriggers++;
+        
+        if (!_animationFrequency.ContainsKey(animationName))
+        {
+            _animationFrequency[animationName] = 0;
+        }
+        _animationFrequency[animationName]++;
+    }
+
+    // Export methods will continue in next file...
+    
     [System.Serializable]
     private class PhaseData
     {
@@ -670,6 +759,7 @@ public class PerformanceProfiler : MonoBehaviour
         public int StartGC0;
         public int StartGC1;
         public int StartGC2;
+        public int LastGC0Count; // For spike detection
 
         public PhaseData(GameState phase)
         {
@@ -697,6 +787,7 @@ public class PerformanceProfiler : MonoBehaviour
             StartGC0 = System.GC.CollectionCount(0);
             StartGC1 = System.GC.CollectionCount(1);
             StartGC2 = System.GC.CollectionCount(2);
+            LastGC0Count = StartGC0;
         }
     }
 
@@ -711,6 +802,229 @@ public class PerformanceProfiler : MonoBehaviour
         public int GCCount0;
         public int GCCount1;
         public int GCCount2;
+        
+        // Enhanced metrics
+        public int EventsThisFrame;
+        public float MainThreadTime;
+        public long GCAllocThisFrame;
+        public int DrawCalls;
+        public int Batches;
+    }
+
+    private struct WarmupMetrics
+    {
+        public float StartTime;
+        public float EndTime;
+        public float Duration;
+        public long StartMemory;
+        public long EndMemory;
+        public int StartGC0;
+        public int EndGC0;
+    }
+
+    public void ExportData()
+    {
+        // Build comprehensive summary string and JSON payload, then buffer via SessionFileSaver
+        try
+        {
+            // Inline summary builder (kept concise here; detailed fields are in JSON)
+            var sb = new StringBuilder();
+            sb.AppendLine("╔════════════════════════════════════════════════════════════════╗");
+            sb.AppendLine("║ COMPREHENSIVE PERFORMANCE SUMMARY ║");
+            sb.AppendLine("╚════════════════════════════════════════════════════════════════╝");
+            sb.AppendLine();
+            sb.AppendLine($"Mode: {_currentMode}");
+            sb.AppendLine($"Session ID: {_sessionId}");
+            sb.AppendLine($"Date: {System.DateTime.Now}");
+            sb.AppendLine($"Total Duration (session): {_sessionTimer.Elapsed.TotalSeconds:F2} seconds");
+            sb.AppendLine();
+            sb.AppendLine("--- State entry counts ---");
+            sb.AppendLine($" Prep entered: {_stateEntryCounts[GameState.Prep]}");
+            sb.AppendLine($" Simulate entered: {_stateEntryCounts[GameState.Simulate]}");
+            sb.AppendLine($" Win entered: {_stateEntryCounts[GameState.Win]}");
+            sb.AppendLine();
+            
+            string summary = sb.ToString();
+            string json = BuildExportJson(summary);
+            
+            // Ensure SessionFileSaver session started
+            try
+            {
+                SessionFileSaver.Instance.BeginSession(_sessionId, _currentMode);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PerformanceProfiler] Could not begin SessionFileSaver session: {e.Message}");
+            }
+            
+            // Buffer JSON
+            SessionFileSaver.Instance.SetPendingSessionJson(json);
+            
+            // Buffer summary text
+            SessionFileSaver.Instance.BufferFile("Summary.txt", summary);
+            
+            // Buffer CSVs for each phase
+            foreach (var kvp in _phaseData)
+            {
+                if (kvp.Value.Samples == null || kvp.Value.Samples.Count ==0) continue;
+                string csv = BuildPhaseCSV(kvp.Key.ToString(), kvp.Value);
+                SessionFileSaver.Instance.BufferFile($"{kvp.Key}.csv", csv);
+            }
+            
+            // Buffering complete. Notify SessionFileSaver that buffered files are ready to be written
+            // when the profiled scene unloads.
+            try
+            {
+                SessionFileSaver.Instance.MarkReadyToSave();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PerformanceProfiler] Could not mark SessionFileSaver ready: {e.Message}");
+            }
+            
+            Debug.Log("[PerformanceProfiler] Session JSON, summary and CSVs buffered for write on GameScene unload.");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[PerformanceProfiler] Failed to prepare session export: {e.Message}");
+        }
+    }
+
+    // Build the single JSON payload (includes structured data + comprehensive summary string)
+    private string BuildExportJson(string comprehensiveSummary)
+    {
+        var exportData = new SessionExportData
+        {
+            Mode = _currentMode.ToString(),
+            SessionId = _sessionId,
+            TotalDuration = _sessionTimer.Elapsed.TotalSeconds,
+            Phases = new List<PhaseExportData>(),
+            AtomsMetrics = null
+        };
+
+        foreach (var kvp in _phaseData)
+        {
+            if (kvp.Value.Samples.Count ==0) continue;
+
+            var phaseExport = new PhaseExportData
+            {
+                Phase = kvp.Key.ToString(),
+                Duration = kvp.Value.Duration,
+                AvgFPS = kvp.Value.Samples.Select(s => s.FPS).Average(),
+                MinFPS = kvp.Value.Samples.Select(s => s.FPS).Min(),
+                MaxFPS = kvp.Value.Samples.Select(s => s.FPS).Max(),
+                AvgFrameTime = kvp.Value.Samples.Select(s => s.FrameTime).Average(),
+                PeakMemoryMB = kvp.Value.PeakMemory / (1024f *1024f),
+                GC0 = kvp.Value.Samples.LastOrDefault().GCCount0,
+                GC1 = kvp.Value.Samples.LastOrDefault().GCCount1,
+                GC2 = kvp.Value.Samples.LastOrDefault().GCCount2,
+                TotalAttacks = kvp.Value.TotalAttacks,
+                TotalDamage = kvp.Value.TotalDamageDealt,
+                UnitsSpawned = kvp.Value.TotalUnitsSpawned,
+                UnitsDied = kvp.Value.TotalUnitsDied,
+
+                AvgMainThreadTime = kvp.Value.Samples.Select(s => s.MainThreadTime).Average(),
+                MaxMainThreadTime = kvp.Value.Samples.Select(s => s.MainThreadTime).Max(),
+                TotalGCAlloc = kvp.Value.Samples.Sum(s => s.GCAllocThisFrame),
+                AvgDrawCalls = (float)kvp.Value.Samples.Select(s => s.DrawCalls).Average(),
+                AvgBatches = (float)kvp.Value.Samples.Select(s => s.Batches).Average(),
+
+                ProjectilesSpawned = _projectilesSpawned,
+                ProjectileRetargets = _projectileRetargets,
+                SplashDamageHits = _splashDamageHits,
+                TotalSplashDamage = _totalSplashDamage,
+                NavMeshRecalculations = _navMeshPathRecalculations,
+                NavMeshStucks = _navMeshAgentStucks,
+                TotalPathLength = _totalNavMeshPathLength,
+                StateTransitions = _totalStateTransitions,
+                AnimationTriggers = _animationTriggers
+            };
+
+            exportData.Phases.Add(phaseExport);
+        }
+
+        if (_currentMode == SimulationMode.Atoms)
+        {
+            exportData.AtomsMetrics = new AtomsMetricsData
+            {
+                ScriptableObjectsLoaded = _scriptableObjectsLoaded,
+                EventDispatches = _atomsEventDispatches,
+                EventListenerInvocations = _atomsEventListenerInvocations,
+                VariableReads = _atomsVariableReads,
+                VariableWrites = _atomsVariableWrites,
+                AllocationBytes = _atomsAllocationBytes,
+                CascadingWrites = _cascadingWrites,
+                GCSpikes = _atomsGCSpikes,
+                AvgEventDispatchTime = _atomsEventDispatches >0 ? (_totalEventDispatchTime / (float)_atomsEventDispatches) :0,
+                AvgVariableReadTime = _atomsVariableReads >0 ? (_totalVariableReadTime / (float)_atomsVariableReads) :0,
+                AvgVariableWriteTime = _atomsVariableWrites >0 ? (_totalVariableWriteTime / (float)_atomsVariableWrites) :0,
+                InstancersCreated = _instancersCreated,
+                InstancerCreationTime = _instancerCreationTime,
+                CollectionAdds = _atomsCollectionAdds,
+                CollectionRemoves = _atomsCollectionRemoves,
+                AvgEventLatency = _avgEventLatency,
+                MaxEventLatency = _maxEventLatency,
+                IndirectionLookups = _indirectionLookups,
+                HeapFragmentation = _heapFragmentation,
+                WarmupDuration = _warmupMetrics.Duration,
+                WarmupMemoryAlloc = (_warmupMetrics.EndMemory - _warmupMetrics.StartMemory) / (1024f *1024f)
+            };
+        }
+
+        // Build combined export object compatible with PerformanceComparison.SessionData but with extras
+        var combined = new CombinedExport
+        {
+            Mode = exportData.Mode,
+            SessionId = exportData.SessionId,
+            TotalDuration = exportData.TotalDuration,
+            Phases = exportData.Phases,
+            AtomsMetrics = exportData.AtomsMetrics,
+            ComprehensiveSummary = comprehensiveSummary,
+            StateEntryCounts = new StateEntryCountsData
+            {
+                Prep = _stateEntryCounts.ContainsKey(GameState.Prep) ? _stateEntryCounts[GameState.Prep] :0,
+                Simulate = _stateEntryCounts.ContainsKey(GameState.Simulate) ? _stateEntryCounts[GameState.Simulate] :0,
+                Win = _stateEntryCounts.ContainsKey(GameState.Win) ? _stateEntryCounts[GameState.Win] :0
+            }
+        };
+
+        string json = JsonUtility.ToJson(combined, true);
+        return json;
+    }
+
+    private string BuildPhaseCSV(string phaseName, PhaseData phase)
+    {
+        var csv = new StringBuilder();
+        csv.AppendLine("Timestamp,FPS,FrameTimeMs,MemoryMB,ActiveUnits,GC0,GC1,GC2,EventsThisFrame,MainThreadTime,GCAllocThisFrame,DrawCalls,Batches");
+
+        foreach (var sample in phase.Samples)
+        {
+            csv.AppendLine($"{sample.Timestamp:F3},{sample.FPS:F2},{sample.FrameTime:F3},{sample.MemoryUsageMB:F2},{sample.ActiveUnits},{sample.GCCount0},{sample.GCCount1},{sample.GCCount2},{sample.EventsThisFrame},{sample.MainThreadTime:F3},{sample.GCAllocThisFrame},{sample.DrawCalls},{sample.Batches}");
+        }
+
+        return csv.ToString();
+    }
+
+    [System.Serializable]
+    private class CombinedExport
+    {
+        public string Mode;
+        public string SessionId;
+        public double TotalDuration;
+        public List<PhaseExportData> Phases;
+        public AtomsMetricsData AtomsMetrics;
+
+        // Extras
+        public string ComprehensiveSummary;
+        public StateEntryCountsData StateEntryCounts;
+    }
+
+    [System.Serializable]
+    private class StateEntryCountsData
+    {
+        public int Prep;
+        public int Simulate;
+        public int Win;
     }
 
     [System.Serializable]
@@ -726,7 +1040,7 @@ public class PerformanceProfiler : MonoBehaviour
     [System.Serializable]
     private class PhaseExportData
     {
-        public string Phase;
+        public string Phase;  // CHANGED: Was GameState, now string
         public double Duration;
         public float AvgFPS;
         public float MinFPS;
@@ -740,6 +1054,24 @@ public class PerformanceProfiler : MonoBehaviour
         public int TotalDamage;
         public int UnitsSpawned;
         public int UnitsDied;
+
+        // Enhanced
+        public float AvgMainThreadTime;
+        public float MaxMainThreadTime;
+        public long TotalGCAlloc;
+        public float AvgDrawCalls;
+        public float AvgBatches;
+        
+        // ADDED: Shared metrics (11-14)
+        public int ProjectilesSpawned;
+        public int ProjectileRetargets;
+        public int SplashDamageHits;
+        public int TotalSplashDamage;
+        public int NavMeshRecalculations;
+        public int NavMeshStucks;
+        public float TotalPathLength;
+        public int StateTransitions;
+        public int AnimationTriggers;
     }
 
     [System.Serializable]
@@ -747,8 +1079,24 @@ public class PerformanceProfiler : MonoBehaviour
     {
         public int ScriptableObjectsLoaded;
         public int EventDispatches;
+        public int EventListenerInvocations;
         public int VariableReads;
         public int VariableWrites;
         public long AllocationBytes;
+        public int CascadingWrites;
+        public int GCSpikes;
+        public float AvgEventDispatchTime;
+        public float AvgVariableReadTime;
+        public float AvgVariableWriteTime;
+        public int InstancersCreated;
+        public float InstancerCreationTime;
+        public int CollectionAdds;
+        public int CollectionRemoves;
+        public float AvgEventLatency;
+        public float MaxEventLatency;
+        public int IndirectionLookups;
+        public float HeapFragmentation;
+        public float WarmupDuration;
+        public float WarmupMemoryAlloc;
     }
 }
